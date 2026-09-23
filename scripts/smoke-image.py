@@ -62,6 +62,8 @@ client_version = "1.0.1"
             except urllib.error.HTTPError as error:
                 assert error.code == expected
         run("docker", "exec", name, "moenotes-server", "check-config", "/etc/moenotes/config.toml")
+        for path in ("LICENSE", "PROTOCOL-NOTICE.md"):
+            run("docker", "exec", name, "test", "-s", f"/usr/share/doc/moenotes-api/{path}")
         run("docker", "stop", "--time", "5", name)
         assert run("docker", "inspect", "--format", "{{.State.ExitCode}}", name, text=True).strip() == "0"
     finally:

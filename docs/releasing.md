@@ -20,6 +20,7 @@ Rust documentation, release-script tests and Docker build-input validation.
 Then native `ubuntu-24.04` and `ubuntu-24.04-arm` runners build Linux amd64/arm64
 images. Each image is loaded and tested for version, non-root identity, config
 validation, health, authentication, default-disabled routes and graceful shutdown.
+License and protocol notices are included under `/usr/share/doc/moenotes-api`.
 Fixtures are synthetic; these checks never log in to or query game servers.
 
 Two independent caches reduce repeat Rust compilation:

@@ -3,6 +3,7 @@ ARG RUNTIME_IMAGE=debian:bookworm-slim
 
 FROM scratch AS inputs
 COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
+COPY LICENSE ./LICENSE
 COPY proto ./proto
 COPY client ./client
 COPY server ./server
@@ -34,6 +35,8 @@ LABEL org.opencontainers.image.title="moenotes-api" \
       org.opencontainers.image.revision="${REVISION}" \
       org.opencontainers.image.source="${SOURCE}"
 COPY --from=build /src/target/release/moenotes-server /usr/local/bin/moenotes-server
+COPY --from=inputs /LICENSE /usr/share/doc/moenotes-api/LICENSE
+COPY --from=inputs /proto/NOTICE.md /usr/share/doc/moenotes-api/PROTOCOL-NOTICE.md
 USER 65532:65532
 EXPOSE 8080
 ENTRYPOINT ["moenotes-server"]
