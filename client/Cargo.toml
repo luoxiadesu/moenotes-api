@@ -1,0 +1,39 @@
+[package]
+name = "moenotes-client"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+description = "Experimental read-only Our Notes gRPC client"
+
+[dependencies]
+moenotes-proto = { path = "../proto" }
+async-trait.workspace = true
+bytes.workspace = true
+http.workspace = true
+prost.workspace = true
+prost-reflect.workspace = true
+serde.workspace = true
+serde_json = { workspace = true, features = ["raw_value"] }
+tokio.workspace = true
+tokio-util.workspace = true
+tonic.workspace = true
+thiserror.workspace = true
+url.workspace = true
+uuid.workspace = true
+zeroize.workspace = true
+base64 = "0.22"
+md-5 = "0.10"
+percent-encoding = "2"
+rand = "0.8"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+rsa = "0.9"
+
+[dev-dependencies]
+tokio-stream.workspace = true
+axum = { workspace = true, features = ["http2"] }
+http-body-util = "0.1"
+http-body = "1"
+tempfile = "3"
+futures-util = "0.3"

@@ -1,0 +1,5 @@
+/target/
+/config.toml
+/secrets/
+*.pem
+.env

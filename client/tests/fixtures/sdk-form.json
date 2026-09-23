@@ -1,0 +1,102 @@
+{
+  "oracle": "OpenJDK + published OkHttp 3.12.13 / Okio 1.15.0; synthetic values only",
+  "cases": [
+    {
+      "mode": "encoded",
+      "input": "alpha",
+      "encoded": "alpha",
+      "decoded": "alpha"
+    },
+    {
+      "mode": "raw",
+      "input": "alpha",
+      "encoded": "alpha",
+      "decoded": "alpha"
+    },
+    {
+      "mode": "encoded",
+      "input": "a+b%2Bc%20d",
+      "encoded": "a+b%2Bc%20d",
+      "decoded": "a b+c d"
+    },
+    {
+      "mode": "raw",
+      "input": "a+b%2Bc%20d",
+      "encoded": "a%2Bb%252Bc%2520d",
+      "decoded": "a+b%2Bc%20d"
+    },
+    {
+      "mode": "encoded",
+      "input": "a b+%/=&",
+      "encoded": "a%20b+%%2F%3D%26",
+      "decoded": "a b %/=&"
+    },
+    {
+      "mode": "raw",
+      "input": "a b+%/=&",
+      "encoded": "a%20b%2B%25%2F%3D%26",
+      "decoded": "a b+%/=&"
+    },
+    {
+      "mode": "encoded",
+      "input": "\u6e2c\u8a66\ud83c\udfb5",
+      "encoded": "%E6%B8%AC%E8%A9%A6%F0%9F%8E%B5",
+      "decoded": "\u6e2c\u8a66\ud83c\udfb5"
+    },
+    {
+      "mode": "raw",
+      "input": "\u6e2c\u8a66\ud83c\udfb5",
+      "encoded": "%E6%B8%AC%E8%A9%A6%F0%9F%8E%B5",
+      "decoded": "\u6e2c\u8a66\ud83c\udfb5"
+    },
+    {
+      "mode": "encoded",
+      "input": "x\t\n\r\fy",
+      "encoded": "xy",
+      "decoded": "xy"
+    },
+    {
+      "mode": "raw",
+      "input": "x\t\n\r\fy",
+      "encoded": "x%09%0A%0D%0Cy",
+      "decoded": "x\t\n\r\fy"
+    },
+    {
+      "mode": "encoded",
+      "input": "!*'()~_-.",
+      "encoded": "%21*%27%28%29%7E_-.",
+      "decoded": "!*'()~_-."
+    },
+    {
+      "mode": "raw",
+      "input": "!*'()~_-.",
+      "encoded": "%21*%27%28%29%7E_-.",
+      "decoded": "!*'()~_-."
+    },
+    {
+      "mode": "encoded",
+      "input": "%broken%2G",
+      "encoded": "%broken%2G",
+      "decoded": "%broken%2G"
+    },
+    {
+      "mode": "raw",
+      "input": "%broken%2G",
+      "encoded": "%25broken%252G",
+      "decoded": "%broken%2G"
+    },
+    {
+      "mode": "encoded",
+      "input": "a%00b",
+      "encoded": "a%00b",
+      "decoded": "a\u0000b"
+    },
+    {
+      "mode": "raw",
+      "input": "a%00b",
+      "encoded": "a%2500b",
+      "decoded": "a%00b"
+    }
+  ],
+  "signature": "ad3e9cdca19869398e373e9c7f04c924"
+}

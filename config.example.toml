@@ -1,0 +1,20 @@
+# Copy to config.toml and supply your own authorized session configuration.
+listen = "127.0.0.1:8080"
+enable_experimental_raw = false
+api_key_file = "secrets/http-api-key"
+# credentials_file = "secrets/game-session.json"
+timeout_seconds = 10
+minimum_interval_ms = 1000
+queue_capacity = 32
+cache_ttl_seconds = 15
+cache_capacity = 1024
+
+[session]
+region = "configure-your-region"
+origin = "https://game.example.invalid"
+allowed_origins = ["https://game.example.invalid"]
+platform = "android"
+client_version = "1.0.1"
+# Supply both together when required by the validated session.
+# master_version = "validated-master-version"
+# resource_version = "validated-resource-version"

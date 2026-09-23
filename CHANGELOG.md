@@ -1,0 +1,27 @@
+# Changelog
+
+Version numbers follow MAJOR.MINOR.PATCH. Pre-release APIs are experimental.
+
+## 0.1.0-dev - Unreleased
+
+- Add descriptor-based protocol generation and protobuf JSON reflection.
+- Add allowlisted read-query client with static credential injection and session isolation.
+- Add opt-in raw HTTP queries, API key access, bounded cache and OpenAPI.
+- Add offline protocol, loopback gRPC, session and HTTP/cache tests.
+- Add redacted, origin/region-bound Android OneSDK callback import and explicit
+  pre-login/game-login methods, outside the query allowlist and HTTP routes.
+- Preserve native probe/login field differences and atomically rotate session
+  generations only after validated login responses; never force device override.
+- Add offline auth mapping, malformed-response, binding, cancellation and race tests.
+- Add explicit SDK HTTP RSA, password and cached-key login primitives with
+  recovered POST encoding/signing, instance-bound RSA challenges, bounded HTTPS
+  transport and redacted pending results. No automatic game-session conversion.
+- Add same-version OkHttp form vectors and loopback SDK HTTP regression tests.
+- Fix Docker build inputs to include embedded SDK documentation; check the
+  actual Docker context with an offline build before building the runtime image.
+- Reject excessive scheduling intervals and cache lifetimes/capacities through
+  direct Rust APIs, preventing duration-overflow panics and failed cache flights.
+- Document security boundaries and the remaining RSA dependency advisory.
+
+No live API compatibility, complete SDK login flow, automatic renewal or stable public API is
+claimed. No official `0.1.0` release has been made.

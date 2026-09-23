@@ -1,0 +1,48 @@
+# Security Boundaries
+
+This is an experimental, offline-tested integration, not a production authentication
+service or an official API. No stable release or security audit certification is
+claimed. Use only accounts and upstream services you are authorized to access.
+
+## Deployment
+
+- Keep raw query routes disabled until account-specific response fields have an
+  approved exposure policy. All HTTP key holders share the configured game account.
+- Bind to loopback by default. Remote deployments need TLS termination, request
+  timeouts, connection limits, rate limiting and operator-key rotation at a trusted
+  reverse proxy. The in-process admission limit is not an internet-facing DoS shield.
+- Never commit credentials, SDK callbacks, AppKeys, private configuration, account
+  captures or device identifiers. Keep operator secrets outside the source tree or
+  in the ignored `secrets/` directory, with owner-only permissions on Unix.
+- Do not log protobuf messages, raw SDK failure data or sensitive accessors.
+  Redacted wrappers and best-effort zeroization do not wipe every library buffer.
+- Login can affect upstream account/session state. Cancellation is not rollback.
+  SDK HTTP success is pending; it does not complete consent or authorize game access.
+
+## Dependency Advisory Review
+
+Reviewed 2026-09-23 against RustSec database revision
+`6477ec04375b913e13f38d966dc49eba9d178cb8` and the checked-in `Cargo.lock`.
+This was a locked-package advisory inventory and manual version/applicability
+review, **not a successful `cargo audit` run**. Installing cargo-audit was stopped
+after stalled dependency downloads; rerun the standard tool before a public release.
+
+`rsa 0.9.10` has unresolved
+[RUSTSEC-2023-0071](https://rustsec.org/advisories/RUSTSEC-2023-0071.html), a private-key
+timing side channel. Production code only loads public keys and encrypts passwords.
+Private-key generation/decryption exists exclusively in offline synthetic tests.
+The reported private-key recovery path is therefore not used by this project's
+production code, but the dependency remains flagged and is not declared patched.
+Reassess before adding any private-key operation; do not globally suppress the
+advisory. Other inventoried non-withdrawn advisories were covered by the locked
+versions' patched or unaffected ranges at review time.
+
+Recovered MD5 signing and RSA PKCS#1 v1.5 encryption reproduce a legacy protocol;
+they are not recommendations for new cryptographic designs. Successful offline
+tests do not establish the upstream service's security or acceptance policy.
+
+## Reporting
+
+Use a private maintainer channel or GitHub private vulnerability reporting when
+available. Share a minimal synthetic reproducer, not real account secrets or game
+captures. Do not post credential-bearing requests or responses in public issues.

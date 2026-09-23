@@ -1,0 +1,12 @@
+**
+!Cargo.toml
+!Cargo.lock
+!rust-toolchain.toml
+!proto/
+!proto/**
+!client/
+!client/**
+!server/
+!server/**
+!docs/
+!docs/**

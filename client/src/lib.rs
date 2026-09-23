@@ -1,0 +1,287 @@
+//! Experimental game queries and explicit SDK-to-game login. No automatic retry.
+pub mod auth;
+mod error;
+mod query;
+pub mod sdk_http;
+mod session;
+pub mod transport;
+
+pub use error::{ClientError, ErrorKind};
+pub use moenotes_proto::generated;
+pub use query::{METHODS, Method, Query};
+pub use session::{CredentialProvider, Credentials, SessionConfig, StaticCredentials};
+pub use tokio_util::sync::CancellationToken;
+pub use uuid::Uuid as Generation;
+
+use async_trait::async_trait;
+use moenotes_proto::pool;
+use prost_reflect::DynamicMessage;
+use std::{
+    sync::{Arc, RwLock},
+    time::{Duration, SystemTime},
+};
+use tokio::{
+    sync::{Mutex, Semaphore},
+    time::Instant,
+};
+use transport::{GrpcTransport, Transport};
+
+#[derive(Clone)]
+pub struct QueryResponse {
+    pub message: DynamicMessage,
+    pub fetched_at: SystemTime,
+    pub generation: Generation,
+}
+
+#[async_trait]
+pub trait QueryClient: Send + Sync {
+    fn generation(&self) -> Generation;
+    async fn execute(
+        &self,
+        generation: Generation,
+        query: Query,
+        cancel: CancellationToken,
+    ) -> Result<QueryResponse, ClientError>;
+}
+
+#[derive(Clone, Debug)]
+pub struct ClientOptions {
+    pub timeout: Duration,
+    pub minimum_interval: Duration,
+    pub queue_capacity: usize,
+}
+impl Default for ClientOptions {
+    fn default() -> Self {
+        Self {
+            timeout: Duration::from_secs(10),
+            minimum_interval: Duration::from_secs(1),
+            queue_capacity: 32,
+        }
+    }
+}
+
+/// Local observations, never a claim that a credential is currently valid upstream.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SessionStatus {
+    Anonymous,
+    CredentialsUnverified,
+    AuthenticationRejected,
+    VersionBlocked,
+    DeviceConflict,
+}
+
+struct Session {
+    generation: Generation,
+    config: SessionConfig,
+    credentials: Option<Credentials>,
+    transport: Arc<dyn Transport>,
+    cancel: CancellationToken,
+    blocked: RwLock<Option<ErrorKind>>,
+}
+
+pub struct Client {
+    session: RwLock<Arc<Session>>,
+    serial: Mutex<Instant>,
+    admission: Semaphore,
+    options: ClientOptions,
+}
+
+impl Client {
+    pub fn new(
+        config: SessionConfig,
+        provider: Option<&dyn CredentialProvider>,
+        options: ClientOptions,
+    ) -> Result<Self, ClientError> {
+        let transport = Arc::new(GrpcTransport::new(&config)?);
+        Self::with_transport(config, provider, options, transport)
+    }
+
+    pub fn with_transport(
+        config: SessionConfig,
+        provider: Option<&dyn CredentialProvider>,
+        options: ClientOptions,
+        transport: Arc<dyn Transport>,
+    ) -> Result<Self, ClientError> {
+        if options.timeout.is_zero()
+            || options.timeout > Duration::from_secs(120)
+            || options.minimum_interval > Duration::from_secs(60)
+            || options.queue_capacity > 4096
+        {
+            return Err(ClientError::new(ErrorKind::InvalidConfig));
+        }
+        let session = Self::make_session(config, provider, transport)?;
+        Ok(Self {
+            session: RwLock::new(Arc::new(session)),
+            serial: Mutex::new(Instant::now()),
+            admission: Semaphore::new(options.queue_capacity + 1),
+            options,
+        })
+    }
+
+    fn make_session(
+        config: SessionConfig,
+        provider: Option<&dyn CredentialProvider>,
+        transport: Arc<dyn Transport>,
+    ) -> Result<Session, ClientError> {
+        config.validate()?;
+        let credentials = provider
+            .map(|p| p.credentials(&config))
+            .transpose()?
+            .flatten();
+        config.metadata(credentials.as_ref(), "validation", false)?;
+        Ok(Session {
+            generation: Generation::new_v4(),
+            config,
+            credentials,
+            transport,
+            cancel: CancellationToken::new(),
+            blocked: RwLock::new(None),
+        })
+    }
+
+    /// Replaces rather than mutates authentication. Old work is cancelled and cannot
+    /// be cached as the new identity. New origins never inherit old credentials.
+    pub fn replace_session(
+        &self,
+        config: SessionConfig,
+        provider: Option<&dyn CredentialProvider>,
+    ) -> Result<(), ClientError> {
+        let transport = Arc::new(GrpcTransport::new(&config)?);
+        let new = Arc::new(Self::make_session(config, provider, transport)?);
+        let mut current = self.session.write().unwrap();
+        current.cancel.cancel();
+        *current = new;
+        Ok(())
+    }
+
+    pub async fn query(&self, query: Query) -> Result<QueryResponse, ClientError> {
+        self.execute(self.generation(), query, CancellationToken::new())
+            .await
+    }
+
+    pub fn session_status(&self) -> SessionStatus {
+        let session = self.session.read().unwrap();
+        match *session.blocked.read().unwrap() {
+            Some(ErrorKind::Authentication) => SessionStatus::AuthenticationRejected,
+            Some(ErrorKind::Version) => SessionStatus::VersionBlocked,
+            Some(ErrorKind::DeviceConflict) => SessionStatus::DeviceConflict,
+            _ if session.credentials.is_some() => SessionStatus::CredentialsUnverified,
+            _ => SessionStatus::Anonymous,
+        }
+    }
+
+    fn session_for(&self, generation: Generation) -> Result<Arc<Session>, ClientError> {
+        let session = self.session.read().unwrap().clone();
+        if session.generation != generation {
+            return Err(ClientError::new(ErrorKind::SessionChanged));
+        }
+        Ok(session)
+    }
+
+    // Keep response validation and any session installation inside the serial slot.
+    async fn run_operation<T>(
+        &self,
+        session: Arc<Session>,
+        method: Method,
+        request: DynamicMessage,
+        metadata: tonic::metadata::MetadataMap,
+        cancel: CancellationToken,
+        finish: impl FnOnce(DynamicMessage) -> Result<T, ClientError>,
+    ) -> Result<T, ClientError> {
+        let _admission = self
+            .admission
+            .try_acquire()
+            .map_err(|_| ClientError::new(ErrorKind::QueueFull))?;
+        let work = async {
+            let mut next = self.serial.lock().await;
+            if let Some(kind) = *session.blocked.read().unwrap()
+                && (!method.anonymous
+                    || (auth::is_login_method(method)
+                        && matches!(kind, ErrorKind::Version | ErrorKind::DeviceConflict)))
+            {
+                return Err(ClientError::new(kind));
+            }
+            tokio::time::sleep_until(*next).await;
+            *next = Instant::now() + self.options.minimum_interval;
+            let result = session
+                .transport
+                .call(method, request, metadata, self.options.timeout)
+                .await;
+            if let Err(error) = &result
+                && matches!(
+                    error.kind,
+                    ErrorKind::Authentication | ErrorKind::Version | ErrorKind::DeviceConflict
+                )
+            {
+                let mut blocked = session.blocked.write().unwrap();
+                // Anonymous support errors must not weaken a version/device block.
+                if !matches!(
+                    *blocked,
+                    Some(ErrorKind::Version | ErrorKind::DeviceConflict)
+                ) {
+                    *blocked = Some(error.kind);
+                }
+            }
+            let message = result?;
+            if cancel.is_cancelled() {
+                return Err(ClientError::new(ErrorKind::Cancelled));
+            }
+            if self.generation() != session.generation {
+                return Err(ClientError::new(ErrorKind::SessionChanged));
+            }
+            use prost_reflect::ReflectMessage;
+            if message.descriptor().full_name() != method.output {
+                return Err(ClientError::new(ErrorKind::Protocol));
+            }
+            finish(message)
+        };
+        tokio::select! {
+            biased;
+            _ = cancel.cancelled() => Err(ClientError::new(ErrorKind::Cancelled)),
+            _ = session.cancel.cancelled() => Err(ClientError::new(ErrorKind::SessionChanged)),
+            result = tokio::time::timeout(self.options.timeout, work) => result.unwrap_or_else(|_| Err(ClientError::new(ErrorKind::Timeout))),
+        }
+    }
+}
+
+#[async_trait]
+impl QueryClient for Client {
+    fn generation(&self) -> Generation {
+        self.session.read().unwrap().generation
+    }
+
+    async fn execute(
+        &self,
+        generation: Generation,
+        query: Query,
+        cancel: CancellationToken,
+    ) -> Result<QueryResponse, ClientError> {
+        query.validate()?;
+        let session = self.session_for(generation)?;
+        if !query.method().anonymous && session.credentials.is_none() {
+            return Err(ClientError::new(ErrorKind::AuthenticationRequired));
+        }
+        let method = *query.method();
+        let request = DynamicMessage::decode(
+            pool().get_message_by_name(method.input).unwrap(),
+            query.encode().as_slice(),
+        )
+        .map_err(|_| ClientError::new(ErrorKind::Protocol))?;
+        let metadata = session.config.metadata(
+            session.credentials.as_ref(),
+            &Generation::new_v4().to_string(),
+            method.anonymous,
+        )?;
+        self.run_operation(session, method, request, metadata, cancel, |message| {
+            Ok(QueryResponse {
+                message,
+                fetched_at: SystemTime::now(),
+                generation,
+            })
+        })
+        .await
+    }
+}
+
+#[cfg(test)]
+mod tests;

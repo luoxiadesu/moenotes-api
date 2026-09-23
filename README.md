@@ -1,0 +1,155 @@
+# moenotes-api
+
+An experimental Rust client and HTTP query gateway for Our Notes, based on
+static analysis of the Android `com.bilibili.sirius` 1.0.1 protocol.
+
+**Offline framework, not a verified live integration.** A complete SDK login flow,
+renewal, live compatibility, server limits and public-response field policy are not yet
+implemented or verified. Version `0.1.0-dev` has no stable API guarantee. This is
+an independent project, not an official or endorsed API.
+
+## What It Supports
+
+- `moenotes-proto`: reproducible message generation and protobuf JSON reflection
+  from a checked-in descriptor snapshot. No `protoc` installation required.
+- `moenotes-client`: 15 audited query operations plus server discovery, version
+  lookup and `Whoami`; HTTPS gRPC, explicit credential injection, cancellation,
+  session isolation, bounded serial scheduling and classified errors. Explicit
+  Android SDK-callback import, pre-login and game-login exchange are library-only.
+  Separate SDK HTTP RSA, password and cached-key primitives are offline-tested;
+  their results remain pending until required SDK post-login checks are completed.
+- `moenotes-server`: API-key-protected HTTP queries, short-lived bounded memory
+  cache, duplicate-request coalescing and experimental OpenAPI documentation.
+
+Queries cover profiles, favorites, event PT rankings and decks, song rankings,
+arena rankings and card trends, circles, gacha probabilities and announcements.
+There are no gameplay write operations, arbitrary RPC proxy, complete SDK/social
+login workflow, database, historical collector, master-data enrichment or Japanese-release
+compatibility claims. Explicit game login can create an account or affect an
+existing session; it is not a read-only query and has no HTTP route.
+
+Raw HTTP responses can include **operator-account-specific fields** such as
+`myRank`, `myScore` and `isSentFavorite`. Query routes are disabled by default.
+Enable them only in a controlled environment until the exposure policy is settled.
+
+## Build
+
+Install rustup and build with the pinned Rust 1.98.1 toolchain:
+
+```sh
+cargo build --locked --workspace
+cargo test --locked --workspace
+cargo fmt --all --check
+cargo clippy --locked --workspace --all-targets -- -D warnings
+```
+
+Dependency downloads are needed for a first build. Protocol generation and all
+tests are offline with respect to the game; gRPC tests use loopback mock servers.
+
+To try HTTP routing without credentials or any upstream connection:
+
+```sh
+cargo run --locked -p moenotes-server --example offline -- 8081
+```
+
+This loopback-only example uses the fixed key
+`offline-demo-key-not-for-production-123456789` and returns empty **synthetic**
+responses. It is not a live-data mode and is not included in the Docker image.
+
+## Rust Client
+
+```rust,no_run
+use moenotes_client::{Client, ClientOptions, Query, SessionConfig};
+
+# async fn example() -> Result<(), Box<dyn std::error::Error>> {
+let config = SessionConfig {
+    region: "operator-selected-region".into(),
+    origin: "https://game.example.invalid".into(),
+    allowed_origins: vec!["https://game.example.invalid".into()],
+    platform: "android".into(),
+    client_version: "1.0.1".into(),
+    master_version: None,
+    resource_version: None,
+};
+let client = Client::new(config, None, ClientOptions::default())?;
+let response = client.query(Query::Announcements(Default::default())).await?;
+let json = moenotes_proto::to_json(&response.message)?;
+# let _ = json;
+# Ok(()) }
+```
+
+The host above is intentionally nonfunctional. Configure an explicitly approved
+origin and matching region before making authorized live requests. Authentication
+is optional only for descriptor-marked anonymous methods, not a maintenance bypass.
+For authenticated queries, supply a `StaticCredentials` provider to `Client::new`.
+See [client and session behavior](docs/client.md).
+For an already authorized OneSDK callback, see [SDK-to-game login](docs/sdk-login.md).
+The separate [SDK HTTP primitives](docs/sdk-http.md) return pending login results;
+they do not bypass SDK checks or implement complete authorization or renewal.
+
+## Run the HTTP Server
+
+Start from `config.example.toml`. Set `api_key_file` to a private file containing
+a random ASCII key of at least 32 characters. On Unix, both secret files must have
+no group/other permissions (for example, mode `0600`). Never put keys on a command
+line or commit them. Relative file paths resolve against the configuration file.
+
+```sh
+cargo run --locked -p moenotes-server -- check-config config.toml
+cargo run --locked -p moenotes-server -- serve config.toml
+```
+
+`check-config` does not make upstream calls or verify credential validity.
+The default bind address is `127.0.0.1:8080`. `/healthz` reports process liveness
+only. `/openapi.json` requires `Authorization: Bearer <HTTP_API_KEY>`.
+
+After explicitly setting `enable_experimental_raw = true`, query routes accept
+POST requests with protobuf JSON bodies. Example request:
+
+```http
+POST /experimental/v1/events/ranking
+Authorization: Bearer <HTTP_API_KEY>
+Content-Type: application/json
+
+{"eventId":"123","ranks":[1,10,100]}
+```
+
+POST is used for structured, read-only query parameters; it does not imply a game
+write operation. The body is the un-enriched protobuf JSON response, with 64-bit
+integers represented as decimal strings. Fetch time and cache status are headers.
+See [HTTP API](docs/http-api.md) for all routes, limits and error meanings.
+
+## Docker
+
+```sh
+docker build -t moenotes-api:dev .
+docker run --rm -p 127.0.0.1:8080:8080 \
+  --mount type=bind,src=/absolute/operator-config,dst=/etc/moenotes,readonly \
+  moenotes-api:dev
+```
+
+Set the mounted config's `listen` to `0.0.0.0:8080` inside the container. The image
+runs as UID/GID 65532; grant that user access to the config and private secret files
+without making secrets group/world-readable. Mount only the necessary directory.
+Use a TLS reverse proxy before exposing HTTP remotely; TLS termination, firewalling
+and operator key rotation are deployment responsibilities. No permissive CORS or
+remote credential-management endpoint is included.
+
+## Documentation
+
+- [Client, authentication and error model](docs/client.md)
+- [SDK-to-game login and analysis boundaries](docs/sdk-login.md)
+- [SDK HTTP login primitives and encoding](docs/sdk-http.md)
+- [Experimental HTTP API](docs/http-api.md)
+- [Protocol provenance and third-party notice](proto/NOTICE.md)
+- Rust API reference: `cargo doc --locked --workspace --no-deps`
+- [Changelog](CHANGELOG.md)
+- [Local validation results and remaining gaps](docs/validation.md)
+- [Security boundaries and dependency advisory review](SECURITY.md)
+
+## License
+
+Original project code is MIT licensed. Recovered third-party protocol content and
+generated definitions are **not** claimed as original MIT work; see
+[proto/NOTICE.md](proto/NOTICE.md). Review redistribution requirements before
+publishing protocol artifacts. No credentials or real account fixtures are included.
