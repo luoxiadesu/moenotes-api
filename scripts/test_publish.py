@@ -13,7 +13,7 @@ spec.loader.exec_module(publish)
 
 
 class PublishTests(unittest.TestCase):
-    def scenario(self, visibility="private", corrupt=False, prerelease=True):
+    def scenario(self, visibility="public", corrupt=False, prerelease=True):
         digests = {"amd64": "sha256:" + "a" * 64, "arm64": "sha256:" + "b" * 64}
         calls = []
 
@@ -44,7 +44,7 @@ class PublishTests(unittest.TestCase):
                 with patch.dict(os.environ, env, clear=True), patch.object(publish, "run", run), \
                         patch.object(publish, "metadata", return_value=info), \
                         patch.object(publish.subprocess, "run", return_value=SimpleNamespace(returncode=1)):
-                    if visibility != "private" or corrupt:
+                    if visibility != "public" or corrupt:
                         with self.assertRaises(ValueError):
                             publish.main()
                         self.assertFalse(any(c[:3] == ("gh", "release", "create") for c in calls))
@@ -64,8 +64,8 @@ class PublishTests(unittest.TestCase):
     def test_publish_stable(self):
         self.scenario(prerelease=False)
 
-    def test_reject_public_package(self):
-        self.scenario(visibility="public")
+    def test_reject_private_package(self):
+        self.scenario(visibility="private")
 
     def test_reject_wrong_manifest(self):
         self.scenario(corrupt=True)

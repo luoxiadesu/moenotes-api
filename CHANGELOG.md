@@ -25,7 +25,7 @@ Version numbers follow MAJOR.MINOR.PATCH. Pre-release APIs are experimental.
   direct Rust APIs, preventing duration-overflow panics and failed cache flights.
 - Document security boundaries and the remaining RSA dependency advisory.
 - Add native Linux amd64/arm64 container builds, offline container smoke tests,
-  private GHCR publication and automated GitHub prereleases after CI passes.
+  public GHCR publication and automated GitHub prereleases after CI passes.
 - Cache Rust test artifacts and export cargo-chef dependency layers through
   architecture-scoped GitHub Actions BuildKit caches.
 - Add matching manifest/lockfile/tag/changelog checks, OCI metadata, immutable

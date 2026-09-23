@@ -73,18 +73,25 @@ release asset and image index before announcing a release.
 Actions use only the short-lived `GITHUB_TOKEN`. Test jobs have `contents: read`;
 image jobs add `packages: write`, and the final release job adds `contents: write`.
 Actions are pinned to commit hashes. No personal PAT is required in repository
-secrets. Consumers of the private package authenticate separately.
+secrets. Public images can be pulled anonymously.
 
-## Privacy and Access
+## Package Visibility
 
-The repository and GHCR package must stay **private** while protocol redistribution
-rights and response-field policy are unresolved. The OCI source label associates
-the package with this repository; verify that the package inherits repository
-access after initial publication. Package visibility is independent of repository
-visibility. Do not assume changing one changes the other.
+The repository and image are distributed publicly by the maintainer's decision.
+This does not establish third-party protocol redistribution rights or settle the
+raw response-field policy. Those remain documented limitations.
 
-Use a read-only `read:packages` token with access to this private package for pulls;
-send it to `docker login --password-stdin`. Never add registry or game tokens to
-Docker build arguments, layers, examples, Git history or release notes. Consult
+The OCI source label associates the package with this repository. A newly created
+GHCR package defaults to private, even for a public repository. After the first
+architecture image is pushed, the maintainer must open the package settings and
+change visibility to **public**. GitHub does not currently expose a supported
+REST/GraphQL operation for this change. The release job refuses to publish a
+release until the package is public and linked to the expected repository. If it
+stops at this guard, change visibility and rerun only the failed job at the same
+tag; the successful image jobs' digest artifacts remain available for seven days.
+No source or tag change is needed. Verify an anonymous pull before announcing.
+
+Never add registry or game tokens to Docker build arguments, layers, examples,
+Git history or release notes. Consult
 [security boundaries](../SECURITY.md) and [protocol provenance](../proto/NOTICE.md)
 before distributing images beyond the authorized team.

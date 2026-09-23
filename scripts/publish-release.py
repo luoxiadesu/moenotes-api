@@ -26,9 +26,9 @@ def main():
         raise ValueError("invalid image digest")
     owner, package = repo.lower().split("/")
     details = json.loads(run("gh", "api", f"/users/{owner}/packages/container/{package}"))
-    if (details.get("visibility") != "private"
+    if (details.get("visibility") != "public"
             or details.get("repository", {}).get("full_name", "").lower() != repo.lower()):
-        raise ValueError("GHCR package must be private and linked to this repository")
+        raise ValueError("GHCR package must be public and linked to this repository; change package visibility in GitHub settings, then rerun this job")
     refs = [f"{image}@{value}" for value in digests.values()]
     version_ref = f"{image}:{info['version']}"
     run("docker", "buildx", "imagetools", "create", "--tag", version_ref,
@@ -43,7 +43,7 @@ def main():
     release = {"version": info["version"], "revision": sha, "image": image,
                "digest": index_digest, "platforms": digests}
     Path("image-digests.json").write_text(json.dumps(release, indent=2) + "\n")
-    notes = info["notes"] + f"\n\n## Container\n\nLinux amd64 and arm64. Private package; registry authentication is required.\n\n```sh\ndocker pull {version_ref}\n# Immutable reference:\ndocker pull {image}@{index_digest}\n```\n\nThe image inherits repository access. No game credentials are included.\n"
+    notes = info["notes"] + f"\n\n## Container\n\nLinux amd64 and arm64. Public package; no registry login is required.\n\n```sh\ndocker pull {version_ref}\n# Immutable reference:\ndocker pull {image}@{index_digest}\n```\n\nNo game credentials are included. Protocol redistribution rights are not established; see proto/NOTICE.md.\n"
     Path("release-notes.md").write_text(notes)
     # Stage release notes/assets in a draft; only expose the release when complete.
     exists = subprocess.run(["gh", "release", "view", info["tag"], "--repo", repo],

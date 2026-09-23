@@ -34,13 +34,11 @@ Enable them only in a controlled environment until the exposure policy is settle
 
 ## Install
 
-Release images are published to the **private** GitHub Container Registry package
-`ghcr.io/luoxiadesu/moenotes-api` for Linux `amd64` and `arm64`. You need repository
-access and a GitHub personal access token (classic) with `read:packages` permission.
-Provide the token through standard input, never as a command-line argument:
+Release images are published to the public GitHub Container Registry package
+`ghcr.io/luoxiadesu/moenotes-api` for Linux `amd64` and `arm64`. No registry login
+is required to pull public images:
 
 ```sh
-printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u YOUR_GITHUB_USER --password-stdin
 docker pull ghcr.io/luoxiadesu/moenotes-api:0.1.0-alpha.1
 docker run --rm --network none ghcr.io/luoxiadesu/moenotes-api:0.1.0-alpha.1 --version
 ```

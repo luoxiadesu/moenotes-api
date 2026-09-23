@@ -14,7 +14,7 @@ local preparation of `0.1.0-alpha.1`, not a stable release.
 - `cargo build --locked --release -p moenotes-server`
 - `cargo doc --locked --workspace --no-deps`
 - Seven Python release-script tests, including version/tag/lockfile consistency,
-  stable/prerelease handling, private-package enforcement and manifest validation.
+  stable/prerelease handling, public-package enforcement and manifest validation.
 - GitHub Actions workflow syntax checked with actionlint 1.7.12.
 - Loopback offline example: health response, authenticated query, MISS followed
   by HIT with the same original fetch timestamp. The example was then stopped.
