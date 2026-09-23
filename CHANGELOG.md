@@ -2,7 +2,9 @@
 
 Version numbers follow MAJOR.MINOR.PATCH. Pre-release APIs are experimental.
 
-## 0.1.0-dev - Unreleased
+## Unreleased
+
+## 0.1.0-alpha.1 - 2026-09-23
 
 - Add descriptor-based protocol generation and protobuf JSON reflection.
 - Add allowlisted read-query client with static credential injection and session isolation.
@@ -22,6 +24,12 @@ Version numbers follow MAJOR.MINOR.PATCH. Pre-release APIs are experimental.
 - Reject excessive scheduling intervals and cache lifetimes/capacities through
   direct Rust APIs, preventing duration-overflow panics and failed cache flights.
 - Document security boundaries and the remaining RSA dependency advisory.
+- Add native Linux amd64/arm64 container builds, offline container smoke tests,
+  private GHCR publication and automated GitHub prereleases after CI passes.
+- Cache Rust test artifacts and export cargo-chef dependency layers through
+  architecture-scoped GitHub Actions BuildKit caches.
+- Add matching manifest/lockfile/tag/changelog checks, OCI metadata, immutable
+  digest release assets and a `moenotes-server --version` command.
 
 No live API compatibility, complete SDK login flow, automatic renewal or stable public API is
 claimed. No official `0.1.0` release has been made.

@@ -3,3 +3,6 @@
 /secrets/
 *.pem
 .env
+__pycache__/
+/image-digests.json
+/release-notes.md

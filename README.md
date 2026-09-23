@@ -5,7 +5,7 @@ static analysis of the Android `com.bilibili.sirius` 1.0.1 protocol.
 
 **Offline framework, not a verified live integration.** A complete SDK login flow,
 renewal, live compatibility, server limits and public-response field policy are not yet
-implemented or verified. Version `0.1.0-dev` has no stable API guarantee. This is
+implemented or verified. Version `0.1.0-alpha.1` has no stable API guarantee. This is
 an independent project, not an official or endorsed API.
 
 ## What It Supports
@@ -32,7 +32,24 @@ Raw HTTP responses can include **operator-account-specific fields** such as
 `myRank`, `myScore` and `isSentFavorite`. Query routes are disabled by default.
 Enable them only in a controlled environment until the exposure policy is settled.
 
-## Build
+## Install
+
+Release images are published to the **private** GitHub Container Registry package
+`ghcr.io/luoxiadesu/moenotes-api` for Linux `amd64` and `arm64`. You need repository
+access and a GitHub personal access token (classic) with `read:packages` permission.
+Provide the token through standard input, never as a command-line argument:
+
+```sh
+printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u YOUR_GITHUB_USER --password-stdin
+docker pull ghcr.io/luoxiadesu/moenotes-api:0.1.0-alpha.1
+docker run --rm --network none ghcr.io/luoxiadesu/moenotes-api:0.1.0-alpha.1 --version
+```
+
+Use an exact version or the immutable digest listed in the GitHub Release.
+There is no `latest` tag. Images contain no configuration or game credentials.
+See [Run the HTTP Server](#run-the-http-server) and [Docker](#docker) before deployment.
+
+### Build From Source
 
 Install rustup and build with the pinned Rust 1.98.1 toolchain:
 
@@ -122,10 +139,10 @@ See [HTTP API](docs/http-api.md) for all routes, limits and error meanings.
 ## Docker
 
 ```sh
-docker build -t moenotes-api:dev .
-docker run --rm -p 127.0.0.1:8080:8080 \
+docker run --rm --cap-drop ALL --security-opt no-new-privileges \
+  -p 127.0.0.1:8080:8080 \
   --mount type=bind,src=/absolute/operator-config,dst=/etc/moenotes,readonly \
-  moenotes-api:dev
+  ghcr.io/luoxiadesu/moenotes-api:0.1.0-alpha.1
 ```
 
 Set the mounted config's `listen` to `0.0.0.0:8080` inside the container. The image
@@ -134,6 +151,11 @@ without making secrets group/world-readable. Mount only the necessary directory.
 Use a TLS reverse proxy before exposing HTTP remotely; TLS termination, firewalling
 and operator key rotation are deployment responsibilities. No permissive CORS or
 remote credential-management endpoint is included.
+
+To build locally, run `docker build -t moenotes-api:dev .`. The multi-stage build
+uses pinned Rust and cargo-chef versions; dependency layers survive application-only
+edits. CI exports these layers to architecture-specific GitHub Actions caches and
+smoke-tests each native Linux image before publishing. See [releasing](docs/releasing.md).
 
 ## Documentation
 
@@ -146,10 +168,11 @@ remote credential-management endpoint is included.
 - [Changelog](CHANGELOG.md)
 - [Local validation results and remaining gaps](docs/validation.md)
 - [Security boundaries and dependency advisory review](SECURITY.md)
+- [Build caches, versioning and release procedure](docs/releasing.md)
 
 ## License
 
-Original project code is MIT licensed. Recovered third-party protocol content and
+Original project code is [MIT licensed](LICENSE). Recovered third-party protocol content and
 generated definitions are **not** claimed as original MIT work; see
 [proto/NOTICE.md](proto/NOTICE.md). Review redistribution requirements before
 publishing protocol artifacts. No credentials or real account fixtures are included.

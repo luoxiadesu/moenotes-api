@@ -30,6 +30,12 @@ client_version = "1.0.1"
     )
     .unwrap();
     let binary = env!("CARGO_BIN_EXE_moenotes-server");
+    let version = Command::new(binary).arg("--version").output().unwrap();
+    assert!(version.status.success());
+    assert_eq!(
+        String::from_utf8(version.stdout).unwrap().trim(),
+        format!("moenotes-server {}", env!("CARGO_PKG_VERSION"))
+    );
     let output = Command::new(binary)
         .arg("check-config")
         .arg(&config)

@@ -10,9 +10,13 @@ use std::{path::Path, sync::Arc, time::Duration};
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = std::env::args().skip(1);
     let command = args.next().unwrap_or_else(|| "help".into());
+    if command == "--version" || command == "-V" {
+        println!("moenotes-server {}", env!("CARGO_PKG_VERSION"));
+        return Ok(());
+    }
     if command == "help" || command == "--help" {
         println!(
-            "moenotes-server <serve|check-config> <config.toml>\nThis CLI uses static credentials only. No game calls are made by check-config."
+            "moenotes-server <serve|check-config> <config.toml>\nmoenotes-server --version\nThis CLI uses static credentials only. No game calls are made by check-config."
         );
         return Ok(());
     }

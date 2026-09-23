@@ -32,7 +32,7 @@ pub fn document() -> Value {
             }
         }}));
     }
-    json!({"openapi":"3.1.0","info":{"title":"moenotes-api","version":"0.1.0-dev","description":"Experimental offline-validated query gateway. Not an official or stable API."},
+    json!({"openapi":"3.1.0","info":{"title":"moenotes-api","version":env!("CARGO_PKG_VERSION"),"description":"Experimental offline-validated query gateway. Not an official or stable API."},
         "paths":paths,"components":{"securitySchemes":{"apiKey":{"type":"http","scheme":"bearer"}},"schemas":schemas}})
 }
 
