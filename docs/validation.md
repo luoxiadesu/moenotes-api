@@ -52,21 +52,28 @@ matching the sample's version. The small oracle's Uri.encode step models its
 allowlist; it does not execute Android framework code. The RSA roundtrip test
 uses one Rust library, not an independent Android implementation.
 
-No game/SDK-server connections or real credentials were used. No remote CI run,
+No game/SDK-server connections or real credentials were used. No
 TLS connection to the game, live SDK/login flow or real account response was
 validated. gRPC/SDK HTTP mocks use loopback plaintext; production transports
 require HTTPS. Tests do not prove live TLS interoperability or account acceptance.
 
-## Pending
+## Container Validation
 
-The multi-stage Docker build was attempted, including a direct-registry retry
-with a 180-second bound. The retry timed out while fetching the Rust builder
-image (approximately 28 of 285 MB), before application compilation. Therefore
-neither a successful container build nor a container runtime smoke test is claimed.
-The Dockerfile and CI build step are present; rerun when registry downloads work.
-No Docker daemon settings or unrelated containers were changed.
-The later build-input check verifies context completeness only, not the full
-Rust/Debian image build or container startup. Those remain unverified.
+Earlier local attempts timed out while downloading the Rust builder image.
+This gap was closed on 2026-09-23 by GitHub Actions run
+[`35872332332`](https://github.com/luoxiadesu/moenotes-api/actions/runs/35872332332)
+at commit `645662d`: the full test gate and native Linux amd64/arm64 builds passed.
+Each runtime image passed `--version`, UID/GID 65532, private synthetic config,
+health, unauthenticated OpenAPI rejection, default-disabled query routes,
+`check-config` and graceful shutdown checks. This was a main-branch validation run,
+not a registry publication. Subsequent release runs are linked from GitHub Releases.
+
+The cold run compiled cargo-chef, cooked locked dependencies, built the real
+application and exported architecture-specific GHA caches. No Docker daemon
+settings or unrelated local containers were changed. Container tests still do not
+validate game connectivity or live authentication.
+
+## Pending
 
 Locked dependency advisories were inventoried from RustSec and reviewed manually;
 see [security boundaries](../SECURITY.md). The RSA private-key timing advisory is
