@@ -2,13 +2,13 @@
 
 The current source uses short GET routes under `/v1`. This replaces the original
 `POST /experimental/v1/...` contract; old routes are not retained or redirected.
-Published `0.1.0-alpha.1` images still use the old contract until a new release.
-The `/v1` namespace does not change the project's pre-release stability policy.
+Published `0.1.0-alpha.1` images use the old contract. The alpha.2 baseline and
+compatibility rules are documented in [API stability](api-stability.md).
 
 Rust cache options are limited to a one-hour TTL and 16,384 entries, matching CLI
 configuration limits. Invalid options fail before upstream work is scheduled.
 
-No response or route stability is promised before the first release. The service
+The documented v1 baseline is compatibility-controlled. The service
 is designed for one operator-configured game session per process. Use separate
 processes and separate configuration for separate regions. All authorized HTTP
 callers use that same upstream identity; API keys are not game credentials.
@@ -17,8 +17,9 @@ callers use that same upstream identity; API keys are not game credentials.
 
 `GET /healthz` is unauthenticated and reports process liveness, not upstream health.
 `GET /openapi.json` requires a bearer API key and describes the experimental routes
-even when disabled. All query routes are disabled unless
-`enable_experimental_raw = true` and always require `Authorization: Bearer ...`.
+even when disabled. Query routes always require `Authorization: Bearer ...`.
+`response_mode` defaults to `public`; `raw` is a trusted-operator opt-in and
+`disabled` turns queries off. Legacy `enable_experimental_raw=true` selects raw.
 Use the configuration/secret files locally; there is no remote management endpoint.
 
 HTTP keys must be 32-4096 ASCII non-whitespace characters, stored separately from
@@ -26,7 +27,10 @@ game credentials. Secret files may have a trailing newline. The process retains 
 SHA-256 hash of the HTTP key and compares hashes in constant time. Restart the
 process to rotate a key or reload configuration. Never pass keys as URL parameters.
 
-Raw response mode is deliberately not a shared public projection. Account-specific
+Public mode recursively whitelists fields, excludes myRank/myScore/isSentFavorite,
+and rejects personalized circle recommendations with 403. It does not anonymize
+public player IDs or guarantee account-independent results. Raw response mode is
+deliberately not a shared public projection. Account-specific
 fields are retained, including recommendation results and favorite status. Only
 enable it for trusted callers until real response comparisons establish a suitable
 public-field policy. Announcement HTML is returned as a JSON string, never executed;
@@ -82,6 +86,10 @@ parameter schema using OpenAPI `style: form`, `explode: true`, suitable for
 Swagger/Postman imports. A GET body is rejected with 400. Other query methods,
 including HEAD, return 405 without performing a query; removed paths return 404.
 
+`GET /readyz` and `GET /v1/status` require the same bearer key and provide sanitized
+readiness and diagnostics. They never initiate upstream probes. Every HTTP response
+has a server-generated `X-Request-Id`. See [operations](operations.md).
+
 There is no HTTP route for arbitrary RPCs, session credentials, Whoami, raw server
 discovery or version management. Client-library support methods are independent.
 The OpenAPI schema is generated from the bundled descriptor; it describes protobuf
@@ -94,11 +102,11 @@ validation uses the [local client limits](client.md); none are asserted server l
 
 ## Responses, Cache and Errors
 
-Successful response bodies contain the upstream protobuf JSON object directly,
+Successful response bodies contain the selected-mode protobuf JSON object directly,
 without a `data` envelope. Defaults are omitted per protobuf JSON; int64/uint64
 are strings, maps are JSON objects, known enums are names and unknown enums are
-numbers. Protobuf unknown fields remain available in the Rust response but are not
-invented as JSON keys. No account-field filtering, enrichment or UI formatting.
+numbers. Public mode drops unapproved and account-specific fields; raw mode leaves
+the upstream JSON intact. No enrichment or UI formatting occurs.
 
 Headers:
 
@@ -115,9 +123,8 @@ the session invalidates old entries. A caller disconnect does not abort a shared
 inflight query; it continues within the client deadline, which can still fill cache.
 Graceful process shutdown cancels pending work. Process restart clears all cache.
 
-Existing unexpired success entries may remain available after a later upstream
-error on another query in the same session; their original fetch time is preserved.
-They are not evidence that the blocked upstream session has recovered.
+Locally blocked authenticated sessions cannot serve cached authenticated responses.
+Anonymous support queries remain callable. Recovery changes the session generation.
 
 Error body: `{"error":{"kind":"maintenance"}}`. No raw upstream body or status
 message is exposed. HTTP 401 means the HTTP key failed, **not** game authentication.
@@ -126,6 +133,7 @@ message is exposed. HTTP 401 means the HTTP key failed, **not** game authenticat
 |---|---|
 | 400 | Invalid query encoding/parameter, nonempty body or local validation failure |
 | 401 | Missing/invalid/duplicate bearer authorization |
+| 403 | Response policy prohibits this route |
 | 404 | Unknown or disabled route |
 | 405 | Unsupported method; read-query routes accept GET only |
 | 429 | Local HTTP/inflight/upstream admission limit reached |
@@ -133,8 +141,9 @@ message is exposed. HTTP 401 means the HTTP key failed, **not** game authenticat
 | 503 | Missing/rejected game session, maintenance, version/device conflict, cancellation or session change |
 | 504 | Operation deadline exceeded |
 
-The gateway does not translate unknown business errors into not-found or empty
-success and does not initiate authentication, retries or background polling.
+The gateway does not translate unknown business errors into empty success. Opt-in
+recovery may perform one background game login after token rejection; it never
+replays the failed query or polls. SDK reauthentication remains an operator command.
 
 ## Deployment
 

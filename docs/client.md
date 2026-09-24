@@ -60,6 +60,8 @@ Credential files are explicitly supplied, read-only and limited to 64 KiB. Unix
 group/other permissions are rejected. Credentials have redacted Debug output and
 zeroize their owned fields on drop; this is best-effort memory hygiene, not a claim
 that every HTTP/2/library allocation is wiped. No session is automatically saved.
+The managed server layer can explicitly opt into recovery/persistence; that policy
+is separate from this low-level client. See [operations](operations.md).
 An operator can explicitly call `Client::save_session(generation, path)` to create
 a private Unix snapshot for later static loading; see [persistence](sdk-login.md#explicit-persistence).
 

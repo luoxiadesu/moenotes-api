@@ -14,10 +14,43 @@ use std::{
 use tower::ServiceExt;
 
 const KEY: &str = "synthetic-http-key-not-for-production-123456789";
+
+#[test]
+fn v1_public_openapi_contract_is_frozen() {
+    assert_eq!(
+        ROUTES.iter().map(|(p, _)| *p).collect::<Vec<_>>(),
+        vec![
+            "/v1/announcement",
+            "/v1/announcements",
+            "/v1/arena/ranking",
+            "/v1/arena/deck-trend",
+            "/v1/circle",
+            "/v1/circles/recommended",
+            "/v1/circles/search",
+            "/v1/event/challenge-ranking",
+            "/v1/event/deck",
+            "/v1/event/ranking",
+            "/v1/profile",
+            "/v1/gacha/rates",
+            "/v1/music/ranking",
+            "/v1/profile/favorites",
+            "/v1/profiles"
+        ]
+    );
+    let mut actual = openapi::document_for(projection::ResponseMode::Public);
+    actual.as_object_mut().unwrap().remove("info");
+    let expected: serde_json::Value =
+        serde_json::from_str(include_str!("../tests/fixtures/v1-openapi.json")).unwrap();
+    assert_eq!(
+        actual, expected,
+        "Public v1 changes require explicit compatibility review"
+    );
+}
 struct Fake {
     generation: RwLock<Generation>,
     calls: AtomicUsize,
     failure: AtomicBool,
+    blocked: AtomicBool,
     delay: Duration,
 }
 impl Fake {
@@ -26,6 +59,7 @@ impl Fake {
             generation: RwLock::new(Generation::new_v4()),
             calls: AtomicUsize::new(0),
             failure: AtomicBool::new(false),
+            blocked: AtomicBool::new(false),
             delay,
         })
     }
@@ -35,6 +69,13 @@ impl Fake {
 }
 #[async_trait]
 impl QueryClient for Fake {
+    fn query_error(&self, anonymous: bool) -> Option<ClientError> {
+        if !anonymous && self.blocked.load(Ordering::SeqCst) {
+            Some(ClientError::new(ErrorKind::Authentication))
+        } else {
+            None
+        }
+    }
     fn generation(&self) -> Generation {
         *self.generation.read().unwrap()
     }
@@ -67,6 +108,106 @@ impl QueryClient for Fake {
             generation,
         })
     }
+}
+
+#[tokio::test]
+async fn blocked_session_never_serves_cached_private_response() {
+    let fake = Fake::new(Duration::ZERO);
+    let cache = QueryCache::new(
+        fake.clone(),
+        CacheOptions::default(),
+        CancellationToken::new(),
+    );
+    let query = Query::from_json(
+        "favorite-status",
+        serde_json::json!({"playerId":"synthetic"}),
+    )
+    .unwrap();
+    cache.query(query.clone()).await.unwrap();
+    fake.blocked.store(true, Ordering::SeqCst);
+    assert!(matches!(
+        cache.query(query).await,
+        Err(ClientError {
+            kind: ErrorKind::Authentication,
+            ..
+        })
+    ));
+    assert_eq!(fake.calls.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test]
+async fn public_policy_and_diagnostics_are_authenticated_and_redacted() {
+    let fake = Fake::new(Duration::ZERO);
+    let app = router_with_options(
+        fake.clone(),
+        Zeroizing::new(KEY.into()),
+        RouterOptions {
+            mode: projection::ResponseMode::Public,
+            managed: None,
+            access_log: false,
+        },
+        CacheOptions::default(),
+        CancellationToken::new(),
+    )
+    .unwrap();
+    let response = app
+        .clone()
+        .oneshot(request(
+            "/v1/profile/favorites",
+            true,
+            serde_json::json!({"playerId":"synthetic"}),
+        ))
+        .await
+        .unwrap();
+    assert!(response.headers().contains_key("x-request-id"));
+    let body: serde_json::Value =
+        serde_json::from_slice(&response.into_body().collect().await.unwrap().to_bytes()).unwrap();
+    assert_eq!(
+        body,
+        serde_json::json!({"totalFavorite":"9007199254740993"})
+    );
+    let denied = app
+        .clone()
+        .oneshot(request(
+            "/v1/circles/recommended",
+            true,
+            serde_json::json!({}),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(denied.status(), StatusCode::FORBIDDEN);
+    assert_eq!(fake.calls.load(Ordering::SeqCst), 1);
+    assert_eq!(
+        app.clone()
+            .oneshot(request("/v1/status", false, serde_json::json!({})))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::UNAUTHORIZED
+    );
+    let status = app
+        .clone()
+        .oneshot(request("/v1/status", true, serde_json::json!({})))
+        .await
+        .unwrap();
+    assert_eq!(status.headers()["cache-control"], "no-store");
+    let raw = status.into_body().collect().await.unwrap().to_bytes();
+    let text = String::from_utf8(raw.to_vec()).unwrap();
+    assert!(!text.contains(KEY) && !text.contains("playerId"));
+    assert_eq!(
+        app.oneshot(request("/readyz", true, serde_json::json!({})))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::SERVICE_UNAVAILABLE
+    );
+    let doc = openapi::document_for(projection::ResponseMode::Public);
+    assert!(doc["paths"].get("/v1/circles/recommended").is_none());
+    assert!(
+        doc["components"]["schemas"]["app.player.GetPlayerFavoriteStatusResponse"]["properties"]
+            .get("isSentFavorite")
+            .is_none()
+    );
 }
 fn q() -> Query {
     Query::from_json("announcement", serde_json::json!({"id":"1"})).unwrap()
@@ -281,7 +422,7 @@ async fn all_http_routes_and_openapi() {
         .unwrap();
     let json: serde_json::Value =
         serde_json::from_slice(&response.into_body().collect().await.unwrap().to_bytes()).unwrap();
-    assert_eq!(json["paths"].as_object().unwrap().len(), 15);
+    assert_eq!(json["paths"].as_object().unwrap().len(), 17);
     for (path, name) in ROUTES {
         let method = moenotes_client::METHODS
             .iter()

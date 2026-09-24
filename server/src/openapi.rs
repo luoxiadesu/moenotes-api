@@ -2,7 +2,7 @@ use prost_reflect::{Kind, MessageDescriptor};
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 
-pub fn document() -> Value {
+pub fn document_for(mode: crate::projection::ResponseMode) -> Value {
     let mut paths = BTreeMap::new();
     let mut schemas = BTreeMap::new();
     for &(path, name) in crate::ROUTES {
@@ -32,7 +32,7 @@ pub fn document() -> Value {
         }).collect();
         paths.insert(path, json!({"get":{
             "operationId":name,"tags":["read queries"],
-            "description":"Disabled unless enable_experimental_raw=true. No request body. Raw response may include operator-account-specific fields. Query string limited to 8192 bytes and 256 parameters.",
+            "description":"No request body. Public mode removes unapproved/account-specific fields; raw mode is operator-only. Query string limited to 8192 bytes and 256 parameters.",
             "security":[{"apiKey":[]}],
             "parameters":parameters,
             "responses":{
@@ -40,11 +40,34 @@ pub fn document() -> Value {
                     "headers":{"X-Moenotes-Cache":{"schema":{"type":"string","enum":["HIT","MISS","COALESCED"]}},"X-Moenotes-Fetched-At":{"schema":{"type":"string"}}},
                     "content":{"application/json":{"schema":{"$ref":format!("#/components/schemas/{}",method.output)}}}},
                 "400":{"description":"Invalid query"},"401":{"description":"Missing or invalid HTTP API key"},
-                "404":{"description":"Route disabled or unknown"},"405":{"description":"Only GET is supported; HEAD does not query upstream"},"429":{"description":"Local request queue full"},
+                "403":{"description":"Route prohibited by response policy"},"404":{"description":"Route disabled or unknown"},"405":{"description":"Only GET is supported; HEAD does not query upstream"},"429":{"description":"Local request queue full"},
                 "502":{"description":"Upstream business, transport or protocol error"},
                 "503":{"description":"Upstream session or availability blocked"},"504":{"description":"Request deadline exceeded"}
             }
         }}));
+    }
+    if mode == crate::projection::ResponseMode::Public {
+        paths.remove("/v1/circles/recommended");
+        for (name, field) in [
+            ("app.event.GetChallengeMusicRankingResponse", "myRank"),
+            ("app.event.GetChallengeMusicRankingResponse", "myScore"),
+            ("app.livemusic.GetRankingResponse", "myRank"),
+            (
+                "app.player.GetPlayerFavoriteStatusResponse",
+                "isSentFavorite",
+            ),
+        ] {
+            if let Some(properties) = schemas
+                .get_mut(name)
+                .and_then(|v| v.get_mut("properties"))
+                .and_then(Value::as_object_mut)
+            {
+                properties.remove(field);
+            }
+        }
+    }
+    for path in ["/v1/status", "/readyz"] {
+        paths.insert(path,json!({"get":{"security":[{"apiKey":[]}],"responses":{"200":{"description":"Sanitized local operational state"},"401":{"description":"Missing API key"},"503":{"description":"Not ready"}}}}));
     }
     json!({"openapi":"3.1.0","info":{"title":"moenotes-api","version":env!("CARGO_PKG_VERSION"),"description":"Experimental GET query gateway with limited live validation. Not an official or stable API."},
         "paths":paths,"components":{"securitySchemes":{"apiKey":{"type":"http","scheme":"bearer"}},"schemas":schemas}})

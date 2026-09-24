@@ -1,7 +1,11 @@
 //! Experimental HTTP gateway. Raw account-dependent data is opt-in, not public-safe.
 pub mod cache;
 pub mod config;
+mod diagnostics;
+pub mod managed;
 mod openapi;
+pub mod operator;
+pub mod projection;
 mod query_params;
 
 use axum::{
@@ -18,7 +22,7 @@ use moenotes_client::{CancellationToken, ClientError, ErrorKind, QueryClient};
 use sha2::{Digest, Sha256};
 use std::{
     sync::Arc,
-    time::{SystemTime, UNIX_EPOCH},
+    time::{Instant, SystemTime, UNIX_EPOCH},
 };
 use subtle::ConstantTimeEq;
 use zeroize::Zeroizing;
@@ -41,17 +45,55 @@ pub const ROUTES: &[(&str, &str)] = &[
     ("/v1/profiles", "profiles"),
 ];
 
+pub fn openapi_document(mode: projection::ResponseMode) -> serde_json::Value {
+    openapi::document_for(mode)
+}
+
 #[derive(Clone)]
 struct ApiState {
     cache: Arc<QueryCache>,
     key_hash: [u8; 32],
     admission: Arc<tokio::sync::Semaphore>,
+    mode: projection::ResponseMode,
+    diagnostics: Arc<diagnostics::Diagnostics>,
+    managed: Option<Arc<managed::ManagedClient>>,
+    access_log: bool,
 }
 
 pub fn router(
     client: Arc<dyn QueryClient>,
     api_key: Zeroizing<String>,
     enable_raw: bool,
+    options: CacheOptions,
+    stop: CancellationToken,
+) -> Result<Router, ClientError> {
+    router_with_options(
+        client,
+        api_key,
+        RouterOptions {
+            mode: if enable_raw {
+                projection::ResponseMode::Raw
+            } else {
+                projection::ResponseMode::Disabled
+            },
+            managed: None,
+            access_log: false,
+        },
+        options,
+        stop,
+    )
+}
+
+pub struct RouterOptions {
+    pub mode: projection::ResponseMode,
+    pub managed: Option<Arc<managed::ManagedClient>>,
+    pub access_log: bool,
+}
+
+pub fn router_with_options(
+    client: Arc<dyn QueryClient>,
+    api_key: Zeroizing<String>,
+    router_options: RouterOptions,
     options: CacheOptions,
     stop: CancellationToken,
 ) -> Result<Router, ClientError> {
@@ -69,10 +111,19 @@ pub fn router(
         cache: QueryCache::new(client, options, stop),
         key_hash: Sha256::digest(api_key.as_bytes()).into(),
         admission: Arc::new(tokio::sync::Semaphore::new(64)),
+        mode: router_options.mode,
+        diagnostics: Arc::new(diagnostics::Diagnostics::default()),
+        managed: router_options.managed,
+        access_log: router_options.access_log,
     };
-    let mut protected =
-        Router::new().route("/openapi.json", get(|| async { Json(openapi::document()) }));
-    if enable_raw {
+    let mode = state.mode;
+    let mut protected = Router::new().route("/openapi.json", get(move || async move { Json(openapi::document_for(mode)) }))
+        .route("/readyz",get(|State(state):State<ApiState>|async move {
+            let ready=state.managed.as_ref().is_some_and(|m|m.ready());
+            (if ready {StatusCode::OK}else{StatusCode::SERVICE_UNAVAILABLE},Json(serde_json::json!({"ready":ready})))
+        }))
+        .route("/v1/status",get(|State(state):State<ApiState>|async move {Json(serde_json::json!({"version":env!("CARGO_PKG_VERSION"),"responseMode":state.mode,"session":state.managed.as_ref().map(|m|m.status()),"diagnostics":state.diagnostics.snapshot()}))}));
+    if mode != projection::ResponseMode::Disabled {
         for &(path, name) in ROUTES {
             protected = protected.route(
                 path,
@@ -88,6 +139,7 @@ pub fn router(
                         if !body.is_empty() {
                             return Err(HttpError(ClientError::new(ErrorKind::InvalidRequest)));
                         }
+                        if !projection::permitted(state.mode,name){return Ok((StatusCode::FORBIDDEN,[("cache-control","no-store")],Json(serde_json::json!({"error":{"kind":"response_policy"}}))).into_response());}
                         let query = query_params::parse(name, raw.as_deref()).map_err(HttpError)?;
                         let (response, status) =
                             state.cache.query(query).await.map_err(HttpError)?;
@@ -101,7 +153,8 @@ pub fn router(
                                 .parse()
                                 .unwrap(),
                         );
-                        Ok::<_, HttpError>((headers, Json(response.json.clone())))
+                        let json=if state.mode==projection::ResponseMode::Public {projection::project(name,&response.json).map_err(HttpError)?}else{response.json.clone()};
+                        Ok::<_, HttpError>((headers, Json(json)).into_response())
                     },
                 ).head(|| async { (StatusCode::METHOD_NOT_ALLOWED, [("allow", "GET"), ("cache-control", "no-store")]) }),
             );
@@ -116,7 +169,37 @@ pub fn router(
             get(|| async { Json(serde_json::json!({"status":"ok"})) }),
         )
         .merge(protected)
-        .with_state(state))
+        .with_state(state.clone())
+        .layer(middleware::from_fn_with_state(state, diagnose)))
+}
+
+async fn diagnose(State(state): State<ApiState>, request: Request, next: Next) -> Response {
+    let _guard = state.diagnostics.begin();
+    let start = Instant::now();
+    let id = uuid::Uuid::new_v4().to_string();
+    let route = ROUTES
+        .iter()
+        .find(|(path, _)| *path == request.uri().path())
+        .map(|(_, name)| *name)
+        .unwrap_or("support_or_unknown");
+    let mut response = next.run(request).await;
+    let status = response.status();
+    if status.is_client_error() || status.is_server_error() {
+        state.diagnostics.error();
+    }
+    response
+        .headers_mut()
+        .insert("x-request-id", id.parse().unwrap());
+    response
+        .headers_mut()
+        .insert("cache-control", "no-store".parse().unwrap());
+    if state.access_log {
+        eprintln!(
+            "{}",
+            serde_json::json!({"event":"http_request","request_id":id,"route":route,"status":status.as_u16(),"duration_ms":start.elapsed().as_millis()})
+        );
+    }
+    response
 }
 
 async fn authenticate(State(state): State<ApiState>, request: Request, next: Next) -> Response {

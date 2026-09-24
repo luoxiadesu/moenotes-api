@@ -5,7 +5,8 @@ authorized Android OneSDK login callback to game credentials. It does not perfor
 the complete SDK login flow or automatic renewal. Separate [SDK HTTP primitives](sdk-http.md)
 cover RSA, password and cached-key requests, but return pending results without
 completing SDK initialization, challenge UI or post-login agreement checks.
-There is no login route in the HTTP gateway and no login CLI command.
+There is no login route in the HTTP gateway. Explicit CLI and recovery orchestration
+is documented in [operations](operations.md); the low-level library never auto-logins.
 
 ## Minimal Integration
 

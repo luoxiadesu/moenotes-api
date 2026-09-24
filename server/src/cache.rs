@@ -86,10 +86,14 @@ impl QueryCache {
     ) -> Result<(Arc<CachedResponse>, &'static str), ClientError> {
         self.options.validate()?;
         query.validate()?;
+        if let Some(error) = self.client.query_error(query.method().anonymous) {
+            return Err(error);
+        }
         if self.stop.is_cancelled() {
             return Err(ClientError::new(ErrorKind::Cancelled));
         }
         let generation = self.client.generation();
+        let anonymous = query.method().anonymous;
         let key = Key {
             generation,
             method: query.method().name,
@@ -102,6 +106,9 @@ impl QueryCache {
             .retain(|k, v| k.generation == generation && v.expires > now);
         state.bytes = state.cache.values().map(|e| e.response.size).sum();
         if let Some(entry) = state.cache.get_mut(&key) {
+            if let Some(error) = self.client.query_error(query.method().anonymous) {
+                return Err(error);
+            }
             entry.touched = now;
             if self.client.generation() != generation {
                 return Err(ClientError::new(ErrorKind::SessionChanged));
@@ -145,6 +152,7 @@ impl QueryCache {
                     result
                 };
                 if let Ok(response) = &result
+                    && this.client.query_error(anonymous).is_none()
                     && this.options.capacity > 0
                     && !this.options.ttl.is_zero()
                     && response.size <= this.options.max_bytes
@@ -183,6 +191,9 @@ impl QueryCache {
         loop {
             let result = receiver.borrow().clone();
             if let Some(result) = result {
+                if let Some(error) = self.client.query_error(anonymous) {
+                    return Err(error);
+                }
                 if self.client.generation() != generation {
                     return Err(ClientError::new(ErrorKind::SessionChanged));
                 }

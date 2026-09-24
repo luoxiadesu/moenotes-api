@@ -5,9 +5,9 @@ static analysis of the Android `com.bilibili.sirius` 1.0.1 protocol.
 
 **Experimental, with limited authorized live validation.** SDK password login,
 game login, session persistence and selected queries have passed live checks;
-see [validation scope](docs/live-validation.md). Complete SDK flows, renewal,
-server limits and public-response field policy remain incomplete.
-Version `0.1.0-alpha.1` has no stable API guarantee. This is
+see [validation scope](docs/live-validation.md). Complete SDK consent/renewal flows,
+upstream limits and exhaustive account-visibility validation remain incomplete.
+Version `0.1.0-alpha.2` establishes a [versioned HTTP contract](docs/api-stability.md). This is
 an independent project, not an official or endorsed API.
 
 ## What It Supports
@@ -17,10 +17,12 @@ an independent project, not an official or endorsed API.
 - `moenotes-client`: 15 audited query operations plus server discovery, version
   lookup and `Whoami`; HTTPS gRPC, explicit credential injection, cancellation,
   session isolation, bounded serial scheduling and classified errors. Explicit
-  Android SDK-callback import, pre-login and game-login exchange are library-only.
+  Android SDK-callback import, pre-login and game-login exchange have explicit operator commands.
   Separate SDK HTTP RSA, password and cached-key primitives are available;
   their results remain pending until required SDK post-login checks are completed.
   Explicit private Unix SDK/session snapshots support restart without re-login.
+  Opt-in bounded recovery renews rejected game sessions from approved SDK caches;
+  expired SDK tokens require operator reauthentication.
 - `moenotes-server`: API-key-protected HTTP queries, short-lived bounded memory
   cache, duplicate-request coalescing and OpenAPI documentation. Read routes use
   GET with short `/v1` resource paths and URL query parameters.
@@ -32,9 +34,10 @@ login workflow, database, historical collector, master-data enrichment or Japane
 compatibility claims. Explicit game login can create an account or affect an
 existing session; it is not a read-only query and has no HTTP route.
 
-Raw HTTP responses can include **operator-account-specific fields** such as
-`myRank`, `myScore` and `isSentFavorite`. Query routes are disabled by default.
-Enable them only in a controlled environment until the exposure policy is settled.
+HTTP defaults to a recursive public-field whitelist, omitting `myRank`, `myScore`
+and `isSentFavorite`. Personalized recommendations are disabled in public mode.
+`response_mode="raw"` retains original responses for trusted operators only.
+All query modes require a bearer key. Public mode is not anonymization.
 
 ## Install
 
@@ -43,8 +46,8 @@ Release images are published to the public GitHub Container Registry package
 is required to pull public images:
 
 ```sh
-docker pull ghcr.io/luoxiadesu/moenotes-api:0.1.0-alpha.1
-docker run --rm --network none ghcr.io/luoxiadesu/moenotes-api:0.1.0-alpha.1 --version
+docker pull ghcr.io/luoxiadesu/moenotes-api:0.1.0-alpha.2
+docker run --rm --network none ghcr.io/luoxiadesu/moenotes-api:0.1.0-alpha.2 --version
 ```
 
 Use an exact version or the immutable digest listed in the GitHub Release.
@@ -122,7 +125,7 @@ cargo run --locked -p moenotes-server -- serve config.toml
 The default bind address is `127.0.0.1:8080`. `/healthz` reports process liveness
 only. `/openapi.json` requires `Authorization: Bearer <HTTP_API_KEY>`.
 
-After explicitly setting `enable_experimental_raw = true`, query routes accept
+Query routes accept
 GET requests with query parameters and no body. Example request:
 
 ```http
@@ -135,9 +138,9 @@ parameter names; IDs are decimal text. The response is un-enriched protobuf JSON
 integers represented as decimal strings. Fetch time and cache status are headers.
 See [HTTP API](docs/http-api.md) for all routes, limits and error meanings.
 
-This source-level change removes the old POST `/experimental/v1/...` routes.
-Published `0.1.0-alpha.1` images do not contain it; build the current source until
-the next release. The upstream game protocol remains gRPC, not HTTP GET.
+This release removes the old POST `/experimental/v1/...` routes. The upstream game
+protocol remains gRPC, not HTTP GET. See [operations](docs/operations.md) for login,
+recovery, SIGHUP reload and authenticated `/readyz` and `/v1/status` diagnostics.
 
 ## Docker
 
@@ -145,12 +148,14 @@ the next release. The upstream game protocol remains gRPC, not HTTP GET.
 docker run --rm --cap-drop ALL --security-opt no-new-privileges \
   -p 127.0.0.1:8080:8080 \
   --mount type=bind,src=/absolute/operator-config,dst=/etc/moenotes,readonly \
-  ghcr.io/luoxiadesu/moenotes-api:0.1.0-alpha.1
+  ghcr.io/luoxiadesu/moenotes-api:0.1.0-alpha.2
 ```
 
 Set the mounted config's `listen` to `0.0.0.0:8080` inside the container. The image
 runs as UID/GID 65532; grant that user access to the config and private secret files
 without making secrets group/world-readable. Mount only the necessary directory.
+For managed login/recovery, additionally mount `login.state_dir` read-write with
+owner-only permissions and UID 65532 ownership; keep configuration mounted read-only.
 Use a TLS reverse proxy before exposing HTTP remotely; TLS termination, firewalling
 and operator key rotation are deployment responsibilities. No permissive CORS or
 remote credential-management endpoint is included.
@@ -163,6 +168,8 @@ smoke-tests each native Linux image before publishing. See [releasing](docs/rele
 ## Documentation
 
 - [Client, authentication and error model](docs/client.md)
+- [Operator login, recovery and diagnostics](docs/operations.md)
+- [API stability and migration](docs/api-stability.md)
 - [SDK-to-game login and analysis boundaries](docs/sdk-login.md)
 - [SDK HTTP login primitives and encoding](docs/sdk-http.md)
 - [Experimental HTTP API](docs/http-api.md)

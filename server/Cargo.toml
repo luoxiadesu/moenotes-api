@@ -23,9 +23,12 @@ zeroize.workspace = true
 prost-reflect.workspace = true
 url.workspace = true
 percent-encoding = "2"
+async-trait.workspace = true
+uuid.workspace = true
+tempfile = "3"
+rpassword = "7"
 
 [dev-dependencies]
-async-trait.workspace = true
+tonic.workspace = true
 tower = { version = "0.5", features = ["util"] }
 http-body-util = "0.1"
-tempfile = "3"

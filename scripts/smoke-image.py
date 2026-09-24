@@ -19,6 +19,7 @@ def main(image, version):
     assert run("docker", "run", "--rm", "--network", "none", image, "--version", text=True).strip() == f"moenotes-server {version}"
     assert run("docker", "image", "inspect", "--format", "{{.Config.User}}", image, text=True).strip() == "65532:65532"
     config = b'''listen = "0.0.0.0:8080"
+response_mode = "disabled"
 api_key_file = "key"
 [session]
 region = "synthetic"

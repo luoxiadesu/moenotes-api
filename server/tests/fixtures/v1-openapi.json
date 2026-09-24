@@ -1,0 +1,2407 @@
+{
+  "components": {
+    "schemas": {
+      "app.announcement.GetListRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "selectedTab": {
+            "oneOf": [
+              {
+                "enum": [
+                  "ALL",
+                  "OPENING_EVENTS",
+                  "BUG"
+                ],
+                "type": "string"
+              },
+              {
+                "format": "int32",
+                "type": "integer"
+              }
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "app.announcement.GetListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "announcements": {
+            "items": {
+              "$ref": "#/components/schemas/entity.Announcement"
+            },
+            "type": "array"
+          },
+          "externalContents": {
+            "items": {
+              "$ref": "#/components/schemas/entity.AnnouncementExternalContent"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "app.announcement.GetRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "pattern": "^-?[0-9]+$",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "app.announcement.GetResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "announcement": {
+            "$ref": "#/components/schemas/entity.Announcement"
+          }
+        },
+        "type": "object"
+      },
+      "app.arena.ArenaRankingRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "arenaSeasonId": {
+            "pattern": "^-?[0-9]+$",
+            "type": "string"
+          },
+          "bandId": {
+            "pattern": "^-?[0-9]+$",
+            "type": "string"
+          },
+          "rankingEnd": {
+            "pattern": "^-?[0-9]+$",
+            "type": "string"
+          },
+          "rankingStart": {
+            "pattern": "^-?[0-9]+$",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "app.arena.ArenaRankingResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "maxRank": {
+            "pattern": "^-?[0-9]+$",
+            "type": "string"
+          },
+          "ranking": {
+            "items": {
+              "$ref": "#/components/schemas/entity.ArenaRankingEntry"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "app.arena.DeckTrendRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "arenaSeasonId": {
+            "pattern": "^-?[0-9]+$",
+            "type": "string"
+          },
+          "musicId": {
+            "pattern": "^-?[0-9]+$",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "app.arena.DeckTrendResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "leaders": {
+            "items": {
+              "$ref": "#/components/schemas/entity.ArenaDeckTrendMemberCard"
+            },
+            "type": "array"
+          },
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/entity.ArenaDeckTrendMemberCard"
+            },
+            "type": "array"
+          },
+          "supports": {
+            "items": {
+              "$ref": "#/components/schemas/entity.ArenaDeckTrendSupportCard"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "app.circle.GetCircleRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "circleId": {
+            "pattern": "^[0-9]+$",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "app.circle.GetCircleResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "circle": {
+            "$ref": "#/components/schemas/entity.CircleDetailWithPlayerList"
+          }
+        },
+        "type": "object"
+      },
+      "app.circle.GetRecommendedCircleListRequest": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "app.circle.GetRecommendedCircleListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "circles": {
+            "items": {
+              "$ref": "#/components/schemas/entity.CircleWithMasterPlayer"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "app.circle.SearchRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "options": {
+            "$ref": "#/components/schemas/entity.SearchOptions"
+          }
+        },
+        "type": "object"
+      },
+      "app.circle.SearchResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "circles": {
+            "items": {
+              "$ref": "#/components/schemas/entity.CircleWithMasterPlayer"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "app.event.ChallengeLiveRankingPlayer": {
+        "additionalProperties": false,
+        "properties": {
+          "highScoreDeck": {
+            "$ref": "#/components/schemas/entity.DeckDetail"
+          },
+          "playerData": {
+            "$ref": "#/components/schemas/entity.PlayerSimpleProfile"
+          },
+          "score": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "app.event.EventRankingEntry": {
+        "additionalProperties": false,
+        "properties": {
+          "point": {
+            "type": "integer"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/entity.PlayerSimpleProfile"
+          },
+          "rank": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "app.event.GetChallengeMusicRankingRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "challengeMusicId": {
+            "pattern": "^-?[0-9]+$",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "app.event.GetChallengeMusicRankingResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "players": {
+            "items": {
+              "$ref": "#/components/schemas/app.event.ChallengeLiveRankingPlayer"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "app.event.GetDeckRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "eventId": {
+            "pattern": "^-?[0-9]+$",
+            "type": "string"
+          },
+          "playerId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "app.event.GetDeckResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "deck": {
+            "$ref": "#/components/schemas/entity.DeckDetail"
+          }
+        },
+        "type": "object"
+      },
+      "app.event.GetRankingListRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "eventId": {
+            "pattern": "^-?[0-9]+$",
+            "type": "string"
+          },
+          "ranks": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "app.event.GetRankingListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "ranking": {
+            "items": {
+              "$ref": "#/components/schemas/app.event.EventRankingEntry"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "app.friend.FindByProfileIDRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "playerProfileId": {
+            "pattern": "^-?[0-9]+$",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "app.friend.FindByProfileIDResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "playerProfile": {
+            "$ref": "#/components/schemas/entity.PlayerSimpleProfile"
+          }
+        },
+        "type": "object"
+      },
+      "app.gacha.ProbabilityRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "gachaId": {
+            "pattern": "^-?[0-9]+$",
+            "type": "string"
+          },
+          "productId": {
+            "pattern": "^-?[0-9]+$",
+            "type": "string"
+          },
+          "selectedPickUp": {
+            "items": {
+              "pattern": "^-?[0-9]+$",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "app.gacha.ProbabilityResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "ensuredLot": {
+            "items": {
+              "$ref": "#/components/schemas/entity.LotProbability"
+            },
+            "type": "array"
+          },
+          "ensuredPrize": {
+            "items": {
+              "$ref": "#/components/schemas/entity.PrizeProbability"
+            },
+            "type": "array"
+          },
+          "ensuredProducts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object"
+          },
+          "lot": {
+            "items": {
+              "$ref": "#/components/schemas/entity.LotProbability"
+            },
+            "type": "array"
+          },
+          "prize": {
+            "items": {
+              "$ref": "#/components/schemas/entity.PrizeProbability"
+            },
+            "type": "array"
+          },
+          "probabilities": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/entity.Probability"
+            },
+            "type": "object"
+          },
+          "products": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "app.livemusic.GetRankingRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "musicId": {
+            "pattern": "^-?[0-9]+$",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "app.livemusic.GetRankingResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "players": {
+            "items": {
+              "$ref": "#/components/schemas/app.livemusic.LiveRankingPlayer"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "app.livemusic.LiveRankingPlayer": {
+        "additionalProperties": false,
+        "properties": {
+          "highScoreDeck": {
+            "$ref": "#/components/schemas/entity.DeckDetail"
+          },
+          "playerData": {
+            "$ref": "#/components/schemas/entity.PlayerSimpleProfile"
+          },
+          "score": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "app.player.GetPlayerFavoriteStatusRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "playerId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "app.player.GetPlayerFavoriteStatusResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "totalFavorite": {
+            "pattern": "^-?[0-9]+$",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "app.playerext.GetPlayerListRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "accountIds": {
+            "items": {
+              "pattern": "^-?[0-9]+$",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "app.playerext.GetPlayerListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "players": {
+            "items": {
+              "$ref": "#/components/schemas/entity.PlayerBriefInfo"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "entity.Announcement": {
+        "additionalProperties": false,
+        "properties": {
+          "bannerPath": {
+            "type": "string"
+          },
+          "bannerUrl": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "category": {
+            "oneOf": [
+              {
+                "enum": [
+                  "UNSPECIFIED",
+                  "OTHER",
+                  "EVENT",
+                  "GACHA",
+                  "CAMPAIGN",
+                  "UPDATE",
+                  "MAINTENANCE",
+                  "BUG"
+                ],
+                "type": "string"
+              },
+              {
+                "format": "int32",
+                "type": "integer"
+              }
+            ]
+          },
+          "endAt": {
+            "pattern": "^-?[0-9]+$",
+            "type": "string"
+          },
+          "id": {
+            "pattern": "^-?[0-9]+$",
+            "type": "string"
+          },
+          "lastUpdatedAt": {
+            "pattern": "^-?[0-9]+$",
+            "type": "string"
+          },
+          "pickupBannerPath": {
+            "type": "string"
+          },
+          "pickupBannerUrl": {
+            "type": "string"
+          },
+          "pickupEndAt": {
+            "pattern": "^-?[0-9]+$",
+            "type": "string"
+          },
+          "pickupStartAt": {
+            "pattern": "^-?[0-9]+$",
+            "type": "string"
+          },
+          "sortOrder": {
+            "type": "integer"
+          },
+          "startAt": {
+            "pattern": "^-?[0-9]+$",
+            "type": "string"
+          },
+          "stylesheetId": {
+            "pattern": "^-?[0-9]+$",
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "entity.AnnouncementExternalContent": {
+        "additionalProperties": false,
+        "properties": {
+          "bannerPath": {
+            "type": "string"
+          },
+          "id": {
+            "pattern": "^-?[0-9]+$",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "entity.ArenaDeckTrendMemberCard": {
+        "additionalProperties": false,
+        "properties": {
+          "memberCardId": {
+            "pattern": "^-?[0-9]+$",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "entity.ArenaDeckTrendSupportCard": {
+        "additionalProperties": false,
+        "properties": {
+          "supportCardId": {
+            "pattern": "^-?[0-9]+$",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "entity.ArenaRankingEntry": {
+        "additionalProperties": false,
+        "properties": {
+          "deck": {
+            "$ref": "#/components/schemas/entity.DeckDetail"
+          },
+          "point": {
+            "type": "integer"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/entity.PlayerSimpleProfile"
+          },
+          "rank": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "entity.Circle": {
+        "additionalProperties": false,
+        "properties": {
+          "currentRank": {
+            "type": "integer"
+          },
+          "description": {
+            "type": "string"
+          },
+          "id": {
+            "pattern": "^[0-9]+$",
+            "type": "string"
+          },
+          "joinRule": {
+            "type": "integer"
+          },
+          "masterLastLoginAt": {
+            "pattern": "^-?[0-9]+$",
+            "type": "string"
+          },
+          "memberCount": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "nextRankPoint": {
+            "type": "integer"
+          },
+          "playStyle": {
+            "type": "integer"
+          },
+          "totalPoint": {
+            "type": "integer"
+          },
+          "weeklyTotalPoint": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "entity.CircleDetailWithPlayerList": {
+        "additionalProperties": false,
+        "properties": {
+          "circleRanking": {
+            "type": "integer"
+          },
+          "detail": {
+            "$ref": "#/components/schemas/entity.Circle"
+          },
+          "players": {
+            "items": {
+              "$ref": "#/components/schemas/entity.CirclePlayer"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "entity.CirclePlayer": {
+        "additionalProperties": false,
+        "properties": {
+          "auth": {
+            "type": "integer"
+          },
+          "circleId": {
+            "pattern": "^[0-9]+$",
+            "type": "string"
+          },
+          "playerId": {
+            "type": "string"
+          },
+          "point": {
+            "type": "integer"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/entity.PlayerSimpleProfile"
+          },
+          "weeklyTotalPoint": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "entity.CircleWithMasterPlayer": {
+        "additionalProperties": false,
+        "properties": {
+          "circle": {
+            "$ref": "#/components/schemas/entity.Circle"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/entity.PlayerSimpleProfile"
+          }
+        },
+        "type": "object"
+      },
+      "entity.DeckCardDetail": {
+        "additionalProperties": false,
+        "properties": {
+          "memberCard": {
+            "$ref": "#/components/schemas/entity.DeckMemberCardDetail"
+          },
+          "performanceOrderIndex": {
+            "type": "integer"
+          },
+          "slotIndex": {
+            "type": "integer"
+          },
+          "supportCard": {
+            "$ref": "#/components/schemas/entity.DeckSupportCardDetail"
+          }
+        },
+        "type": "object"
+      },
+      "entity.DeckDetail": {
+        "additionalProperties": false,
+        "properties": {
+          "cards": {
+            "items": {
+              "$ref": "#/components/schemas/entity.DeckCardDetail"
+            },
+            "type": "array"
+          },
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "totalPower": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "entity.DeckMemberCardDetail": {
+        "additionalProperties": false,
+        "properties": {
+          "awakeCount": {
+            "type": "integer"
+          },
+          "cardId": {
+            "pattern": "^-?[0-9]+$",
+            "type": "string"
+          },
+          "cardRank": {
+            "type": "integer"
+          },
+          "exp": {
+            "type": "integer"
+          },
+          "liveSkillLevel": {
+            "type": "integer"
+          },
+          "performanceSkillLevel": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "entity.DeckSupportCardDetail": {
+        "additionalProperties": false,
+        "properties": {
+          "cardId": {
+            "pattern": "^-?[0-9]+$",
+            "type": "string"
+          },
+          "exp": {
+            "type": "integer"
+          },
+          "rank": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "entity.LotProbability": {
+        "additionalProperties": false,
+        "properties": {
+          "lotId": {
+            "pattern": "^-?[0-9]+$",
+            "type": "string"
+          },
+          "probabilityPercent": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "entity.PlayerBriefInfo": {
+        "additionalProperties": false,
+        "properties": {
+          "accountId": {
+            "pattern": "^-?[0-9]+$",
+            "type": "string"
+          },
+          "avatarId": {
+            "pattern": "^-?[0-9]+$",
+            "type": "string"
+          },
+          "chatBubbleId": {
+            "pattern": "^-?[0-9]+$",
+            "type": "string"
+          },
+          "chatFrameId": {
+            "pattern": "^-?[0-9]+$",
+            "type": "string"
+          },
+          "chatThemeId": {
+            "pattern": "^-?[0-9]+$",
+            "type": "string"
+          },
+          "level": {
+            "type": "integer"
+          },
+          "nickname": {
+            "type": "string"
+          },
+          "playerId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "entity.PlayerSimpleProfile": {
+        "additionalProperties": false,
+        "properties": {
+          "favoriteMemberCard": {
+            "$ref": "#/components/schemas/entity.DeckMemberCardDetail"
+          },
+          "favoriteMemberCardMasterId": {
+            "pattern": "^-?[0-9]+$",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "lastUpdatedAt": {
+            "pattern": "^-?[0-9]+$",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "profileCard": {
+            "$ref": "#/components/schemas/entity.SimpleProfileCard"
+          },
+          "profileId": {
+            "pattern": "^-?[0-9]+$",
+            "type": "string"
+          },
+          "rankExp": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "entity.PrizeProbability": {
+        "additionalProperties": false,
+        "properties": {
+          "prizeId": {
+            "pattern": "^-?[0-9]+$",
+            "type": "string"
+          },
+          "probabilityPercent": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "entity.Probability": {
+        "additionalProperties": false,
+        "properties": {
+          "lot": {
+            "items": {
+              "$ref": "#/components/schemas/entity.LotProbability"
+            },
+            "type": "array"
+          },
+          "prize": {
+            "items": {
+              "$ref": "#/components/schemas/entity.PrizeProbability"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "entity.SearchOptions": {
+        "additionalProperties": false,
+        "properties": {
+          "joinRule": {
+            "oneOf": [
+              {
+                "enum": [
+                  "JOIN_RULE_UNSPECIFIED",
+                  "AUTO",
+                  "REQUEST",
+                  "INVITE"
+                ],
+                "type": "string"
+              },
+              {
+                "format": "int32",
+                "type": "integer"
+              }
+            ]
+          },
+          "memberRange": {
+            "oneOf": [
+              {
+                "enum": [
+                  "MEMBER_RANGE_UNSPECIFIED",
+                  "MEMBER_RANGE_1",
+                  "MEMBER_RANGE_2",
+                  "MEMBER_RANGE_3"
+                ],
+                "type": "string"
+              },
+              {
+                "format": "int32",
+                "type": "integer"
+              }
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "playStyle": {
+            "oneOf": [
+              {
+                "enum": [
+                  "PLAY_STYLE_UNSPECIFIED",
+                  "FREE",
+                  "CASUAL",
+                  "HARD",
+                  "BEGINNER"
+                ],
+                "type": "string"
+              },
+              {
+                "format": "int32",
+                "type": "integer"
+              }
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "entity.SimpleProfileCard": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "slot": {
+            "type": "integer"
+          },
+          "thumbnailUrl": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "apiKey": {
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/readyz": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Sanitized local operational state"
+          },
+          "401": {
+            "description": "Missing API key"
+          },
+          "503": {
+            "description": "Not ready"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ]
+      }
+    },
+    "/v1/announcement": {
+      "get": {
+        "description": "No request body. Public mode removes unapproved/account-specific fields; raw mode is operator-only. Query string limited to 8192 bytes and 256 parameters.",
+        "operationId": "announcement",
+        "parameters": [
+          {
+            "deprecated": false,
+            "description": "Single occurrence only. Nested filters use dotted field names.",
+            "explode": true,
+            "in": "query",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "pattern": "^-?[0-9]+$",
+              "type": "string"
+            },
+            "style": "form"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/app.announcement.GetResponse"
+                }
+              }
+            },
+            "description": "Raw protobuf JSON; 64-bit integers are strings. Fetch time is Unix milliseconds.",
+            "headers": {
+              "X-Moenotes-Cache": {
+                "schema": {
+                  "enum": [
+                    "HIT",
+                    "MISS",
+                    "COALESCED"
+                  ],
+                  "type": "string"
+                }
+              },
+              "X-Moenotes-Fetched-At": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query"
+          },
+          "401": {
+            "description": "Missing or invalid HTTP API key"
+          },
+          "403": {
+            "description": "Route prohibited by response policy"
+          },
+          "404": {
+            "description": "Route disabled or unknown"
+          },
+          "405": {
+            "description": "Only GET is supported; HEAD does not query upstream"
+          },
+          "429": {
+            "description": "Local request queue full"
+          },
+          "502": {
+            "description": "Upstream business, transport or protocol error"
+          },
+          "503": {
+            "description": "Upstream session or availability blocked"
+          },
+          "504": {
+            "description": "Request deadline exceeded"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "tags": [
+          "read queries"
+        ]
+      }
+    },
+    "/v1/announcements": {
+      "get": {
+        "description": "No request body. Public mode removes unapproved/account-specific fields; raw mode is operator-only. Query string limited to 8192 bytes and 256 parameters.",
+        "operationId": "announcements",
+        "parameters": [
+          {
+            "deprecated": false,
+            "description": "Single occurrence only. Nested filters use dotted field names.",
+            "explode": true,
+            "in": "query",
+            "name": "selectedTab",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "enum": [
+                    "ALL",
+                    "OPENING_EVENTS",
+                    "BUG"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "format": "int32",
+                  "type": "integer"
+                }
+              ]
+            },
+            "style": "form"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/app.announcement.GetListResponse"
+                }
+              }
+            },
+            "description": "Raw protobuf JSON; 64-bit integers are strings. Fetch time is Unix milliseconds.",
+            "headers": {
+              "X-Moenotes-Cache": {
+                "schema": {
+                  "enum": [
+                    "HIT",
+                    "MISS",
+                    "COALESCED"
+                  ],
+                  "type": "string"
+                }
+              },
+              "X-Moenotes-Fetched-At": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query"
+          },
+          "401": {
+            "description": "Missing or invalid HTTP API key"
+          },
+          "403": {
+            "description": "Route prohibited by response policy"
+          },
+          "404": {
+            "description": "Route disabled or unknown"
+          },
+          "405": {
+            "description": "Only GET is supported; HEAD does not query upstream"
+          },
+          "429": {
+            "description": "Local request queue full"
+          },
+          "502": {
+            "description": "Upstream business, transport or protocol error"
+          },
+          "503": {
+            "description": "Upstream session or availability blocked"
+          },
+          "504": {
+            "description": "Request deadline exceeded"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "tags": [
+          "read queries"
+        ]
+      }
+    },
+    "/v1/arena/deck-trend": {
+      "get": {
+        "description": "No request body. Public mode removes unapproved/account-specific fields; raw mode is operator-only. Query string limited to 8192 bytes and 256 parameters.",
+        "operationId": "deck-trend",
+        "parameters": [
+          {
+            "deprecated": false,
+            "description": "Single occurrence only. Nested filters use dotted field names.",
+            "explode": true,
+            "in": "query",
+            "name": "musicId",
+            "required": true,
+            "schema": {
+              "pattern": "^-?[0-9]+$",
+              "type": "string"
+            },
+            "style": "form"
+          },
+          {
+            "deprecated": false,
+            "description": "Single occurrence only. Nested filters use dotted field names.",
+            "explode": true,
+            "in": "query",
+            "name": "arenaSeasonId",
+            "required": true,
+            "schema": {
+              "pattern": "^-?[0-9]+$",
+              "type": "string"
+            },
+            "style": "form"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/app.arena.DeckTrendResponse"
+                }
+              }
+            },
+            "description": "Raw protobuf JSON; 64-bit integers are strings. Fetch time is Unix milliseconds.",
+            "headers": {
+              "X-Moenotes-Cache": {
+                "schema": {
+                  "enum": [
+                    "HIT",
+                    "MISS",
+                    "COALESCED"
+                  ],
+                  "type": "string"
+                }
+              },
+              "X-Moenotes-Fetched-At": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query"
+          },
+          "401": {
+            "description": "Missing or invalid HTTP API key"
+          },
+          "403": {
+            "description": "Route prohibited by response policy"
+          },
+          "404": {
+            "description": "Route disabled or unknown"
+          },
+          "405": {
+            "description": "Only GET is supported; HEAD does not query upstream"
+          },
+          "429": {
+            "description": "Local request queue full"
+          },
+          "502": {
+            "description": "Upstream business, transport or protocol error"
+          },
+          "503": {
+            "description": "Upstream session or availability blocked"
+          },
+          "504": {
+            "description": "Request deadline exceeded"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "tags": [
+          "read queries"
+        ]
+      }
+    },
+    "/v1/arena/ranking": {
+      "get": {
+        "description": "No request body. Public mode removes unapproved/account-specific fields; raw mode is operator-only. Query string limited to 8192 bytes and 256 parameters.",
+        "operationId": "arena-ranking",
+        "parameters": [
+          {
+            "deprecated": false,
+            "description": "Single occurrence only. Nested filters use dotted field names.",
+            "explode": true,
+            "in": "query",
+            "name": "arenaSeasonId",
+            "required": true,
+            "schema": {
+              "pattern": "^-?[0-9]+$",
+              "type": "string"
+            },
+            "style": "form"
+          },
+          {
+            "deprecated": false,
+            "description": "Single occurrence only. Nested filters use dotted field names.",
+            "explode": true,
+            "in": "query",
+            "name": "bandId",
+            "required": false,
+            "schema": {
+              "pattern": "^-?[0-9]+$",
+              "type": "string"
+            },
+            "style": "form"
+          },
+          {
+            "deprecated": false,
+            "description": "Single occurrence only. Nested filters use dotted field names.",
+            "explode": true,
+            "in": "query",
+            "name": "rankingStart",
+            "required": true,
+            "schema": {
+              "pattern": "^-?[0-9]+$",
+              "type": "string"
+            },
+            "style": "form"
+          },
+          {
+            "deprecated": false,
+            "description": "Single occurrence only. Nested filters use dotted field names.",
+            "explode": true,
+            "in": "query",
+            "name": "rankingEnd",
+            "required": true,
+            "schema": {
+              "pattern": "^-?[0-9]+$",
+              "type": "string"
+            },
+            "style": "form"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/app.arena.ArenaRankingResponse"
+                }
+              }
+            },
+            "description": "Raw protobuf JSON; 64-bit integers are strings. Fetch time is Unix milliseconds.",
+            "headers": {
+              "X-Moenotes-Cache": {
+                "schema": {
+                  "enum": [
+                    "HIT",
+                    "MISS",
+                    "COALESCED"
+                  ],
+                  "type": "string"
+                }
+              },
+              "X-Moenotes-Fetched-At": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query"
+          },
+          "401": {
+            "description": "Missing or invalid HTTP API key"
+          },
+          "403": {
+            "description": "Route prohibited by response policy"
+          },
+          "404": {
+            "description": "Route disabled or unknown"
+          },
+          "405": {
+            "description": "Only GET is supported; HEAD does not query upstream"
+          },
+          "429": {
+            "description": "Local request queue full"
+          },
+          "502": {
+            "description": "Upstream business, transport or protocol error"
+          },
+          "503": {
+            "description": "Upstream session or availability blocked"
+          },
+          "504": {
+            "description": "Request deadline exceeded"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "tags": [
+          "read queries"
+        ]
+      }
+    },
+    "/v1/circle": {
+      "get": {
+        "description": "No request body. Public mode removes unapproved/account-specific fields; raw mode is operator-only. Query string limited to 8192 bytes and 256 parameters.",
+        "operationId": "circle",
+        "parameters": [
+          {
+            "deprecated": false,
+            "description": "Single occurrence only. Nested filters use dotted field names.",
+            "explode": true,
+            "in": "query",
+            "name": "circleId",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            "style": "form"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/app.circle.GetCircleResponse"
+                }
+              }
+            },
+            "description": "Raw protobuf JSON; 64-bit integers are strings. Fetch time is Unix milliseconds.",
+            "headers": {
+              "X-Moenotes-Cache": {
+                "schema": {
+                  "enum": [
+                    "HIT",
+                    "MISS",
+                    "COALESCED"
+                  ],
+                  "type": "string"
+                }
+              },
+              "X-Moenotes-Fetched-At": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query"
+          },
+          "401": {
+            "description": "Missing or invalid HTTP API key"
+          },
+          "403": {
+            "description": "Route prohibited by response policy"
+          },
+          "404": {
+            "description": "Route disabled or unknown"
+          },
+          "405": {
+            "description": "Only GET is supported; HEAD does not query upstream"
+          },
+          "429": {
+            "description": "Local request queue full"
+          },
+          "502": {
+            "description": "Upstream business, transport or protocol error"
+          },
+          "503": {
+            "description": "Upstream session or availability blocked"
+          },
+          "504": {
+            "description": "Request deadline exceeded"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "tags": [
+          "read queries"
+        ]
+      }
+    },
+    "/v1/circles/search": {
+      "get": {
+        "description": "No request body. Public mode removes unapproved/account-specific fields; raw mode is operator-only. Query string limited to 8192 bytes and 256 parameters.",
+        "operationId": "circle-search",
+        "parameters": [
+          {
+            "deprecated": false,
+            "description": "Single occurrence only. Nested filters use dotted field names.",
+            "explode": true,
+            "in": "query",
+            "name": "options.name",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "style": "form"
+          },
+          {
+            "deprecated": false,
+            "description": "Single occurrence only. Nested filters use dotted field names.",
+            "explode": true,
+            "in": "query",
+            "name": "options.memberRange",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "enum": [
+                    "MEMBER_RANGE_UNSPECIFIED",
+                    "MEMBER_RANGE_1",
+                    "MEMBER_RANGE_2",
+                    "MEMBER_RANGE_3"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "format": "int32",
+                  "type": "integer"
+                }
+              ]
+            },
+            "style": "form"
+          },
+          {
+            "deprecated": false,
+            "description": "Single occurrence only. Nested filters use dotted field names.",
+            "explode": true,
+            "in": "query",
+            "name": "options.joinRule",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "enum": [
+                    "JOIN_RULE_UNSPECIFIED",
+                    "AUTO",
+                    "REQUEST",
+                    "INVITE"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "format": "int32",
+                  "type": "integer"
+                }
+              ]
+            },
+            "style": "form"
+          },
+          {
+            "deprecated": false,
+            "description": "Single occurrence only. Nested filters use dotted field names.",
+            "explode": true,
+            "in": "query",
+            "name": "options.playStyle",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "enum": [
+                    "PLAY_STYLE_UNSPECIFIED",
+                    "FREE",
+                    "CASUAL",
+                    "HARD",
+                    "BEGINNER"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "format": "int32",
+                  "type": "integer"
+                }
+              ]
+            },
+            "style": "form"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/app.circle.SearchResponse"
+                }
+              }
+            },
+            "description": "Raw protobuf JSON; 64-bit integers are strings. Fetch time is Unix milliseconds.",
+            "headers": {
+              "X-Moenotes-Cache": {
+                "schema": {
+                  "enum": [
+                    "HIT",
+                    "MISS",
+                    "COALESCED"
+                  ],
+                  "type": "string"
+                }
+              },
+              "X-Moenotes-Fetched-At": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query"
+          },
+          "401": {
+            "description": "Missing or invalid HTTP API key"
+          },
+          "403": {
+            "description": "Route prohibited by response policy"
+          },
+          "404": {
+            "description": "Route disabled or unknown"
+          },
+          "405": {
+            "description": "Only GET is supported; HEAD does not query upstream"
+          },
+          "429": {
+            "description": "Local request queue full"
+          },
+          "502": {
+            "description": "Upstream business, transport or protocol error"
+          },
+          "503": {
+            "description": "Upstream session or availability blocked"
+          },
+          "504": {
+            "description": "Request deadline exceeded"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "tags": [
+          "read queries"
+        ]
+      }
+    },
+    "/v1/event/challenge-ranking": {
+      "get": {
+        "description": "No request body. Public mode removes unapproved/account-specific fields; raw mode is operator-only. Query string limited to 8192 bytes and 256 parameters.",
+        "operationId": "challenge-ranking",
+        "parameters": [
+          {
+            "deprecated": false,
+            "description": "Single occurrence only. Nested filters use dotted field names.",
+            "explode": true,
+            "in": "query",
+            "name": "challengeMusicId",
+            "required": true,
+            "schema": {
+              "pattern": "^-?[0-9]+$",
+              "type": "string"
+            },
+            "style": "form"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/app.event.GetChallengeMusicRankingResponse"
+                }
+              }
+            },
+            "description": "Raw protobuf JSON; 64-bit integers are strings. Fetch time is Unix milliseconds.",
+            "headers": {
+              "X-Moenotes-Cache": {
+                "schema": {
+                  "enum": [
+                    "HIT",
+                    "MISS",
+                    "COALESCED"
+                  ],
+                  "type": "string"
+                }
+              },
+              "X-Moenotes-Fetched-At": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query"
+          },
+          "401": {
+            "description": "Missing or invalid HTTP API key"
+          },
+          "403": {
+            "description": "Route prohibited by response policy"
+          },
+          "404": {
+            "description": "Route disabled or unknown"
+          },
+          "405": {
+            "description": "Only GET is supported; HEAD does not query upstream"
+          },
+          "429": {
+            "description": "Local request queue full"
+          },
+          "502": {
+            "description": "Upstream business, transport or protocol error"
+          },
+          "503": {
+            "description": "Upstream session or availability blocked"
+          },
+          "504": {
+            "description": "Request deadline exceeded"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "tags": [
+          "read queries"
+        ]
+      }
+    },
+    "/v1/event/deck": {
+      "get": {
+        "description": "No request body. Public mode removes unapproved/account-specific fields; raw mode is operator-only. Query string limited to 8192 bytes and 256 parameters.",
+        "operationId": "event-deck",
+        "parameters": [
+          {
+            "deprecated": false,
+            "description": "Single occurrence only. Nested filters use dotted field names.",
+            "explode": true,
+            "in": "query",
+            "name": "playerId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "style": "form"
+          },
+          {
+            "deprecated": false,
+            "description": "Single occurrence only. Nested filters use dotted field names.",
+            "explode": true,
+            "in": "query",
+            "name": "eventId",
+            "required": true,
+            "schema": {
+              "pattern": "^-?[0-9]+$",
+              "type": "string"
+            },
+            "style": "form"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/app.event.GetDeckResponse"
+                }
+              }
+            },
+            "description": "Raw protobuf JSON; 64-bit integers are strings. Fetch time is Unix milliseconds.",
+            "headers": {
+              "X-Moenotes-Cache": {
+                "schema": {
+                  "enum": [
+                    "HIT",
+                    "MISS",
+                    "COALESCED"
+                  ],
+                  "type": "string"
+                }
+              },
+              "X-Moenotes-Fetched-At": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query"
+          },
+          "401": {
+            "description": "Missing or invalid HTTP API key"
+          },
+          "403": {
+            "description": "Route prohibited by response policy"
+          },
+          "404": {
+            "description": "Route disabled or unknown"
+          },
+          "405": {
+            "description": "Only GET is supported; HEAD does not query upstream"
+          },
+          "429": {
+            "description": "Local request queue full"
+          },
+          "502": {
+            "description": "Upstream business, transport or protocol error"
+          },
+          "503": {
+            "description": "Upstream session or availability blocked"
+          },
+          "504": {
+            "description": "Request deadline exceeded"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "tags": [
+          "read queries"
+        ]
+      }
+    },
+    "/v1/event/ranking": {
+      "get": {
+        "description": "No request body. Public mode removes unapproved/account-specific fields; raw mode is operator-only. Query string limited to 8192 bytes and 256 parameters.",
+        "operationId": "event-ranking",
+        "parameters": [
+          {
+            "deprecated": false,
+            "description": "Single occurrence only. Nested filters use dotted field names.",
+            "explode": true,
+            "in": "query",
+            "name": "eventId",
+            "required": true,
+            "schema": {
+              "pattern": "^-?[0-9]+$",
+              "type": "string"
+            },
+            "style": "form"
+          },
+          {
+            "deprecated": false,
+            "description": "Repeat the parameter for each item; order and duplicates are preserved.",
+            "explode": true,
+            "in": "query",
+            "name": "ranks",
+            "required": true,
+            "schema": {
+              "items": {
+                "type": "integer"
+              },
+              "maxItems": 100,
+              "minItems": 1,
+              "type": "array"
+            },
+            "style": "form"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/app.event.GetRankingListResponse"
+                }
+              }
+            },
+            "description": "Raw protobuf JSON; 64-bit integers are strings. Fetch time is Unix milliseconds.",
+            "headers": {
+              "X-Moenotes-Cache": {
+                "schema": {
+                  "enum": [
+                    "HIT",
+                    "MISS",
+                    "COALESCED"
+                  ],
+                  "type": "string"
+                }
+              },
+              "X-Moenotes-Fetched-At": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query"
+          },
+          "401": {
+            "description": "Missing or invalid HTTP API key"
+          },
+          "403": {
+            "description": "Route prohibited by response policy"
+          },
+          "404": {
+            "description": "Route disabled or unknown"
+          },
+          "405": {
+            "description": "Only GET is supported; HEAD does not query upstream"
+          },
+          "429": {
+            "description": "Local request queue full"
+          },
+          "502": {
+            "description": "Upstream business, transport or protocol error"
+          },
+          "503": {
+            "description": "Upstream session or availability blocked"
+          },
+          "504": {
+            "description": "Request deadline exceeded"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "tags": [
+          "read queries"
+        ]
+      }
+    },
+    "/v1/gacha/rates": {
+      "get": {
+        "description": "No request body. Public mode removes unapproved/account-specific fields; raw mode is operator-only. Query string limited to 8192 bytes and 256 parameters.",
+        "operationId": "probability",
+        "parameters": [
+          {
+            "deprecated": false,
+            "description": "Single occurrence only. Nested filters use dotted field names.",
+            "explode": true,
+            "in": "query",
+            "name": "gachaId",
+            "required": true,
+            "schema": {
+              "pattern": "^-?[0-9]+$",
+              "type": "string"
+            },
+            "style": "form"
+          },
+          {
+            "deprecated": true,
+            "description": "Single occurrence only. Nested filters use dotted field names.",
+            "explode": true,
+            "in": "query",
+            "name": "productId",
+            "required": false,
+            "schema": {
+              "pattern": "^-?[0-9]+$",
+              "type": "string"
+            },
+            "style": "form"
+          },
+          {
+            "deprecated": false,
+            "description": "Repeat the parameter for each item; order and duplicates are preserved.",
+            "explode": true,
+            "in": "query",
+            "name": "selectedPickUp",
+            "required": false,
+            "schema": {
+              "items": {
+                "pattern": "^-?[0-9]+$",
+                "type": "string"
+              },
+              "maxItems": 100,
+              "type": "array"
+            },
+            "style": "form"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/app.gacha.ProbabilityResponse"
+                }
+              }
+            },
+            "description": "Raw protobuf JSON; 64-bit integers are strings. Fetch time is Unix milliseconds.",
+            "headers": {
+              "X-Moenotes-Cache": {
+                "schema": {
+                  "enum": [
+                    "HIT",
+                    "MISS",
+                    "COALESCED"
+                  ],
+                  "type": "string"
+                }
+              },
+              "X-Moenotes-Fetched-At": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query"
+          },
+          "401": {
+            "description": "Missing or invalid HTTP API key"
+          },
+          "403": {
+            "description": "Route prohibited by response policy"
+          },
+          "404": {
+            "description": "Route disabled or unknown"
+          },
+          "405": {
+            "description": "Only GET is supported; HEAD does not query upstream"
+          },
+          "429": {
+            "description": "Local request queue full"
+          },
+          "502": {
+            "description": "Upstream business, transport or protocol error"
+          },
+          "503": {
+            "description": "Upstream session or availability blocked"
+          },
+          "504": {
+            "description": "Request deadline exceeded"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "tags": [
+          "read queries"
+        ]
+      }
+    },
+    "/v1/music/ranking": {
+      "get": {
+        "description": "No request body. Public mode removes unapproved/account-specific fields; raw mode is operator-only. Query string limited to 8192 bytes and 256 parameters.",
+        "operationId": "music-ranking",
+        "parameters": [
+          {
+            "deprecated": false,
+            "description": "Single occurrence only. Nested filters use dotted field names.",
+            "explode": true,
+            "in": "query",
+            "name": "musicId",
+            "required": true,
+            "schema": {
+              "pattern": "^-?[0-9]+$",
+              "type": "string"
+            },
+            "style": "form"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/app.livemusic.GetRankingResponse"
+                }
+              }
+            },
+            "description": "Raw protobuf JSON; 64-bit integers are strings. Fetch time is Unix milliseconds.",
+            "headers": {
+              "X-Moenotes-Cache": {
+                "schema": {
+                  "enum": [
+                    "HIT",
+                    "MISS",
+                    "COALESCED"
+                  ],
+                  "type": "string"
+                }
+              },
+              "X-Moenotes-Fetched-At": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query"
+          },
+          "401": {
+            "description": "Missing or invalid HTTP API key"
+          },
+          "403": {
+            "description": "Route prohibited by response policy"
+          },
+          "404": {
+            "description": "Route disabled or unknown"
+          },
+          "405": {
+            "description": "Only GET is supported; HEAD does not query upstream"
+          },
+          "429": {
+            "description": "Local request queue full"
+          },
+          "502": {
+            "description": "Upstream business, transport or protocol error"
+          },
+          "503": {
+            "description": "Upstream session or availability blocked"
+          },
+          "504": {
+            "description": "Request deadline exceeded"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "tags": [
+          "read queries"
+        ]
+      }
+    },
+    "/v1/profile": {
+      "get": {
+        "description": "No request body. Public mode removes unapproved/account-specific fields; raw mode is operator-only. Query string limited to 8192 bytes and 256 parameters.",
+        "operationId": "profile",
+        "parameters": [
+          {
+            "deprecated": false,
+            "description": "Single occurrence only. Nested filters use dotted field names.",
+            "explode": true,
+            "in": "query",
+            "name": "playerProfileId",
+            "required": true,
+            "schema": {
+              "pattern": "^-?[0-9]+$",
+              "type": "string"
+            },
+            "style": "form"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/app.friend.FindByProfileIDResponse"
+                }
+              }
+            },
+            "description": "Raw protobuf JSON; 64-bit integers are strings. Fetch time is Unix milliseconds.",
+            "headers": {
+              "X-Moenotes-Cache": {
+                "schema": {
+                  "enum": [
+                    "HIT",
+                    "MISS",
+                    "COALESCED"
+                  ],
+                  "type": "string"
+                }
+              },
+              "X-Moenotes-Fetched-At": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query"
+          },
+          "401": {
+            "description": "Missing or invalid HTTP API key"
+          },
+          "403": {
+            "description": "Route prohibited by response policy"
+          },
+          "404": {
+            "description": "Route disabled or unknown"
+          },
+          "405": {
+            "description": "Only GET is supported; HEAD does not query upstream"
+          },
+          "429": {
+            "description": "Local request queue full"
+          },
+          "502": {
+            "description": "Upstream business, transport or protocol error"
+          },
+          "503": {
+            "description": "Upstream session or availability blocked"
+          },
+          "504": {
+            "description": "Request deadline exceeded"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "tags": [
+          "read queries"
+        ]
+      }
+    },
+    "/v1/profile/favorites": {
+      "get": {
+        "description": "No request body. Public mode removes unapproved/account-specific fields; raw mode is operator-only. Query string limited to 8192 bytes and 256 parameters.",
+        "operationId": "favorite-status",
+        "parameters": [
+          {
+            "deprecated": false,
+            "description": "Single occurrence only. Nested filters use dotted field names.",
+            "explode": true,
+            "in": "query",
+            "name": "playerId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "style": "form"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/app.player.GetPlayerFavoriteStatusResponse"
+                }
+              }
+            },
+            "description": "Raw protobuf JSON; 64-bit integers are strings. Fetch time is Unix milliseconds.",
+            "headers": {
+              "X-Moenotes-Cache": {
+                "schema": {
+                  "enum": [
+                    "HIT",
+                    "MISS",
+                    "COALESCED"
+                  ],
+                  "type": "string"
+                }
+              },
+              "X-Moenotes-Fetched-At": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query"
+          },
+          "401": {
+            "description": "Missing or invalid HTTP API key"
+          },
+          "403": {
+            "description": "Route prohibited by response policy"
+          },
+          "404": {
+            "description": "Route disabled or unknown"
+          },
+          "405": {
+            "description": "Only GET is supported; HEAD does not query upstream"
+          },
+          "429": {
+            "description": "Local request queue full"
+          },
+          "502": {
+            "description": "Upstream business, transport or protocol error"
+          },
+          "503": {
+            "description": "Upstream session or availability blocked"
+          },
+          "504": {
+            "description": "Request deadline exceeded"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "tags": [
+          "read queries"
+        ]
+      }
+    },
+    "/v1/profiles": {
+      "get": {
+        "description": "No request body. Public mode removes unapproved/account-specific fields; raw mode is operator-only. Query string limited to 8192 bytes and 256 parameters.",
+        "operationId": "profiles",
+        "parameters": [
+          {
+            "deprecated": false,
+            "description": "Repeat the parameter for each item; order and duplicates are preserved.",
+            "explode": true,
+            "in": "query",
+            "name": "accountIds",
+            "required": true,
+            "schema": {
+              "items": {
+                "pattern": "^-?[0-9]+$",
+                "type": "string"
+              },
+              "maxItems": 100,
+              "minItems": 1,
+              "type": "array"
+            },
+            "style": "form"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/app.playerext.GetPlayerListResponse"
+                }
+              }
+            },
+            "description": "Raw protobuf JSON; 64-bit integers are strings. Fetch time is Unix milliseconds.",
+            "headers": {
+              "X-Moenotes-Cache": {
+                "schema": {
+                  "enum": [
+                    "HIT",
+                    "MISS",
+                    "COALESCED"
+                  ],
+                  "type": "string"
+                }
+              },
+              "X-Moenotes-Fetched-At": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query"
+          },
+          "401": {
+            "description": "Missing or invalid HTTP API key"
+          },
+          "403": {
+            "description": "Route prohibited by response policy"
+          },
+          "404": {
+            "description": "Route disabled or unknown"
+          },
+          "405": {
+            "description": "Only GET is supported; HEAD does not query upstream"
+          },
+          "429": {
+            "description": "Local request queue full"
+          },
+          "502": {
+            "description": "Upstream business, transport or protocol error"
+          },
+          "503": {
+            "description": "Upstream session or availability blocked"
+          },
+          "504": {
+            "description": "Request deadline exceeded"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "tags": [
+          "read queries"
+        ]
+      }
+    },
+    "/v1/status": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Sanitized local operational state"
+          },
+          "401": {
+            "description": "Missing API key"
+          },
+          "503": {
+            "description": "Not ready"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ]
+      }
+    }
+  }
+}

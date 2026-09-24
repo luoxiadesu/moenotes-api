@@ -6,8 +6,9 @@ claimed. Use only accounts and upstream services you are authorized to access.
 
 ## Deployment
 
-- Keep raw query routes disabled until account-specific response fields have an
-  approved exposure policy. All HTTP key holders share the configured game account.
+- Use default public projection for shared callers; raw mode is trusted-operator-only.
+  All HTTP key holders share the configured game account. Public player data remains
+  personal data even after caller-specific fields are removed.
 - Bind to loopback by default. Remote deployments need TLS termination, request
   timeouts, connection limits, rate limiting and operator-key rotation at a trusted
   reverse proxy. The in-process admission limit is not an internet-facing DoS shield.
@@ -23,7 +24,8 @@ claimed. Use only accounts and upstream services you are authorized to access.
 - Explicit SDK/session snapshots are plaintext secret files, not an encrypted vault.
   Unix writes require a private parent directory and never replace existing files;
   keep backups and their parent paths private as well. Windows ACL-based saving is
-  not implemented. There is no automatic password or credential persistence.
+  not implemented. Passwords are never persisted. Opt-in recovery persists rotated
+  game credentials; use a dedicated account and a private writable state directory.
 
 ## Dependency Advisory Review
 

@@ -1,3 +1,4 @@
+use crate::{operator::LoginConfig, projection::ResponseMode};
 use moenotes_client::{ClientError, ClientOptions, ErrorKind, SessionConfig};
 use serde::Deserialize;
 use std::{
@@ -14,6 +15,12 @@ pub struct Config {
     pub listen: SocketAddr,
     #[serde(default)]
     pub enable_experimental_raw: bool,
+    pub response_mode: Option<ResponseMode>,
+    #[serde(default = "yes")]
+    pub access_log: bool,
+    pub login: Option<LoginConfig>,
+    #[serde(default)]
+    pub recovery: RecoveryConfig,
     pub api_key_file: PathBuf,
     pub credentials_file: Option<PathBuf>,
     pub session: SessionConfig,
@@ -27,6 +34,28 @@ pub struct Config {
     pub cache_ttl_seconds: u64,
     #[serde(default = "entries")]
     pub cache_capacity: usize,
+}
+#[derive(Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RecoveryConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default = "cooldown")]
+    pub cooldown_seconds: u64,
+}
+fn cooldown() -> u64 {
+    300
+}
+fn yes() -> bool {
+    true
+}
+impl Default for RecoveryConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            cooldown_seconds: cooldown(),
+        }
+    }
 }
 fn listen() -> SocketAddr {
     SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 8080)
@@ -55,6 +84,14 @@ impl Config {
             || config.cache_ttl_seconds > 3600
             || config.minimum_interval_ms > 60000
             || config.queue_capacity > 4096
+            || config.timeout_seconds == 0
+            || config.timeout_seconds > 120
+            || config.recovery.cooldown_seconds < 60
+            || config.recovery.cooldown_seconds > 86400
+            || config.recovery.enabled && config.login.is_none()
+            || config.login.is_some() && config.credentials_file.is_some()
+            || config.enable_experimental_raw
+                && config.response_mode.is_some_and(|m| m != ResponseMode::Raw)
         {
             return Err(invalid());
         }
@@ -68,7 +105,29 @@ impl Config {
         {
             *file = parent.join(&*file);
         }
+        if let Some(login) = &mut config.login {
+            if login.context_file.is_relative() {
+                login.context_file = parent.join(&login.context_file);
+            }
+            if login.state_dir.is_relative() {
+                login.state_dir = parent.join(&login.state_dir);
+            }
+            if let Some(file) = &mut login.sdk_http_file
+                && file.is_relative()
+            {
+                *file = parent.join(&*file);
+            }
+        }
         Ok(config)
+    }
+
+    pub fn mode(&self) -> ResponseMode {
+        self.response_mode
+            .unwrap_or(if self.enable_experimental_raw {
+                ResponseMode::Raw
+            } else {
+                ResponseMode::Public
+            })
     }
 
     pub fn client_options(&self) -> ClientOptions {

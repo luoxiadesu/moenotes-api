@@ -111,6 +111,23 @@ async fn game_session_export_roundtrips_and_checks_generation() {
     assert_eq!(restored.credential, "synthetic-new-secret");
     assert_eq!(restored.bid.as_deref(), Some("synthetic-sdk-uid"));
     assert_eq!(restored.device_id, None);
+    let provider = StaticCredentials::from_file(&path).unwrap();
+    assert!(
+        client
+            .matches_identity(receipt.generation, &provider)
+            .unwrap()
+    );
+    let other = StaticCredentials::new(
+        config().region,
+        config().origin,
+        Credentials {
+            player_id: "another-player".into(),
+            credential: "x".into(),
+            device_id: None,
+            bid: Some("synthetic-sdk-uid".into()),
+        },
+    );
+    assert!(!client.matches_identity(receipt.generation, &other).unwrap());
     assert!(client.save_session(receipt.generation, &path).is_err());
     *client.session.read().unwrap().blocked.write().unwrap() = Some(ErrorKind::Authentication);
     assert_eq!(

@@ -4,6 +4,19 @@ Version numbers follow MAJOR.MINOR.PATCH. Pre-release APIs are experimental.
 
 ## Unreleased
 
+## 0.1.0-alpha.2 - 2026-09-24
+
+- Add operator `sdk-login`, `game-login`, `auth-status` commands, private login
+  configuration, explicit SDK-readiness/account-creation flags and scoped snapshots.
+- Add opt-in bounded game credential recovery from approved SDK authorization,
+  single-flight/cooldown, no original-query replay, account identity checks and
+  fail-closed persistence. SDK expiry requires explicit operator login.
+- Add SIGHUP credential reload, authenticated readiness/status, correlation IDs
+  and sanitized JSON diagnostics. Reject old authenticated cache after local blocks.
+- Default HTTP responses to a recursive public-field whitelist; retain explicit raw
+  mode and disable personalized recommendations in public mode.
+- Establish the `/v1` compatibility baseline and pin its public OpenAPI contract.
+
 - **Breaking HTTP change:** replace POST `/experimental/v1/...` queries with short
   GET `/v1/...` resource routes and URL parameters; remove old routes without redirects.
   Arrays use repeated keys and nested filters use dotted names. Preserve upstream

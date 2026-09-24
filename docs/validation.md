@@ -1,5 +1,31 @@
 # Validation Record
 
+## Alpha.2 Operations
+
+Pre-release checks passed: 70 Rust tests (36 client, 3 protocol, 28 server,
+1 CLI lifecycle, 2 operator commands), two doctests, seven release-script tests,
+fmt, all-target Clippy, documentation generation and Docker build-input check.
+A full local amd64 Docker build and offline container smoke also passed. Recovery
+faults were simulated; real SDK expiry was not forced on the operator's account.
+
+Review adds a managed recovery layer with explicit operator CLI, scoped snapshots,
+atomic state pointer, cross-process authentication lock, no account substitution,
+no failed-query replay, one attempt per generation and a cooldown across generations.
+Tests include real Client/mock Transport recovery through persistence, generation
+invalidation, concurrent admission, reload exclusion, cancellation and fail-closed
+post-login persistence errors. No test forces real token expiry or device conflicts.
+
+Public-mode recursive projection, personalized-route rejection, diagnostic authentication,
+request IDs, cache blocking and a pinned OpenAPI/route contract are regression-tested.
+The operator CLI was exercised with an authorized dedicated account: SDK password
+login saved pending authorization; explicit game login saved private SDK/game files.
+No password was stored. A separate live gateway smoke verified public profile and
+favorite queries, readiness transition, sanitized status/logs and SIGHUP reload;
+the service was stopped afterward. Configuration and status commands are offline.
+
+Container and GitHub Actions checks gate alpha.2 publication. Earlier records below
+describe their historical code/version and do not override the current contract.
+
 ## 2026-09-24 Update
 
 Current source includes GET `/v1` routing and SDK/session persistence. All 54
@@ -101,6 +127,7 @@ No successful cargo-audit run is claimed. A staged-file scan found no recognized
 secret patterns, private paths or executable analysis artifacts; this is not a
 guarantee of legal redistribution rights or exhaustive secret detection.
 
-Complete SDK authorization/renewal, successful authorized game requests, current versions/master,
-real server limits, field visibility and the public-response projection policy
-remain separate future work. The public Rust/HTTP APIs are not frozen.
+At the initial validation stage, SDK authorization/renewal, live requests and a
+public-field policy were pending. Subsequent results are recorded above and in
+live-validation.md; complete SDK consent/renewal and upstream limits remain open.
+The HTTP v1 baseline is now defined in api-stability.md; Rust APIs remain experimental.

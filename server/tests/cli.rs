@@ -19,6 +19,7 @@ fn cli_validates_starts_and_shuts_down_without_upstream_calls() {
         &config,
         r#"
 listen = "127.0.0.1:0"
+response_mode = "disabled"
 api_key_file = "key"
 [session]
 region = "test"

@@ -3,8 +3,9 @@
 `moenotes_client::sdk_http` implements three explicit GS SDK POST operations from
 the Android 1.0.1 sample. RSA and email/password calls have authorized live samples;
 these remain library primitives, **not a complete SDK login workflow**.
-See [validation scope](live-validation.md). No HTTP gateway routes or CLI
-login commands are added. Account owners must authorize their use.
+See [validation scope](live-validation.md). No HTTP login routes are exposed;
+operator CLI commands are described in [operations](operations.md). Account owners
+must authorize their use.
 
 | Method | Path | Business fields |
 | --- | --- | --- |

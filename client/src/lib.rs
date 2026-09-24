@@ -37,6 +37,10 @@ pub struct QueryResponse {
 #[async_trait]
 pub trait QueryClient: Send + Sync {
     fn generation(&self) -> Generation;
+    /// A local admission check; it must not contact the upstream service.
+    fn query_error(&self, _anonymous: bool) -> Option<ClientError> {
+        None
+    }
     async fn execute(
         &self,
         generation: Generation,
@@ -171,6 +175,21 @@ impl Client {
         }
     }
 
+    /// Compare a scoped provider's account identity without exposing credentials.
+    /// This is a local check, not upstream verification; token rotation is ignored.
+    pub fn matches_identity(
+        &self,
+        generation: Generation,
+        provider: &dyn CredentialProvider,
+    ) -> Result<bool, ClientError> {
+        let session = self.session_for(generation)?;
+        let supplied = provider.credentials(&session.config)?;
+        Ok(match (&session.credentials, supplied) {
+            (Some(a), Some(b)) => a.player_id == b.player_id && a.bid == b.bid,
+            _ => false,
+        })
+    }
+
     /// Explicit Unix-only, no-overwrite export for StaticCredentials::from_file.
     /// The parent directory must be private. No network call or renewal is made.
     pub fn save_session(
@@ -271,6 +290,20 @@ impl Client {
 impl QueryClient for Client {
     fn generation(&self) -> Generation {
         self.session.read().unwrap().generation
+    }
+
+    fn query_error(&self, anonymous: bool) -> Option<ClientError> {
+        if anonymous {
+            return None;
+        }
+        let session = self.session.read().unwrap();
+        if let Some(kind) = *session.blocked.read().unwrap() {
+            return Some(ClientError::new(kind));
+        }
+        if session.credentials.is_none() {
+            return Some(ClientError::new(ErrorKind::AuthenticationRequired));
+        }
+        None
     }
 
     async fn execute(
