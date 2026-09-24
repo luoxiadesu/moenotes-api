@@ -46,8 +46,8 @@ Release images are published to the public GitHub Container Registry package
 is required to pull public images:
 
 ```sh
-docker pull ghcr.io/luoxiadesu/moenotes-api:0.1.0-alpha.3
-docker run --rm --network none ghcr.io/luoxiadesu/moenotes-api:0.1.0-alpha.3 --version
+docker pull ghcr.io/luoxiadesu/moenotes-api:0.1.0-alpha.4
+docker run --rm --network none ghcr.io/luoxiadesu/moenotes-api:0.1.0-alpha.4 --version
 ```
 
 Use an exact version or the immutable digest listed in the GitHub Release.
@@ -111,17 +111,16 @@ they do not bypass SDK checks or implement complete authorization or renewal.
 
 ## Run the HTTP Server
 
-Unreleased source supports one `config.toml` for the HTTP key, game session,
+Since `0.1.0-alpha.4`, one `config.toml` holds the HTTP key, game session,
 device context and SDK HTTP settings. Account passwords remain in `/accounts`.
 The blank [template](config.example.toml) starts health-only until filled in;
-see [single-file configuration](docs/configuration.md). The published alpha.3
-image still uses the file-based configuration below.
+see [single-file configuration](docs/configuration.md).
 
-For the alpha.3 image, use the file-based example in [operations](docs/operations.md).
-Set `api_key_file` to a private file containing
-a random ASCII key of at least 32 characters. On Unix, both secret files must have
-no group/other permissions (for example, mode `0600`). Never put keys on a command
-line or commit them. Relative file paths resolve against the configuration file.
+Fill in `config.example.toml` and set `api_key` to a random ASCII key of at least
+32 characters. Protect the populated config and account files with mode `0600`,
+without group/other permissions. Never put keys on a command line or commit them.
+Legacy file sources remain supported; see [operations](docs/operations.md).
+Relative file paths resolve against the configuration file.
 
 ```sh
 cargo run --locked -p moenotes-server -- check-config config.toml
@@ -129,7 +128,8 @@ cargo run --locked -p moenotes-server -- serve config.toml
 ```
 
 `check-config` does not make upstream calls or verify credential validity.
-The default bind address is `127.0.0.1:8080`. `/healthz` reports process liveness
+The binary's default bind address is `127.0.0.1:8080`; the container-oriented
+template sets `0.0.0.0:8080`. `/healthz` reports process liveness
 only. `/openapi.json` requires `Authorization: Bearer <HTTP_API_KEY>`.
 
 Since `0.1.0-alpha.3`, missing configuration starts a
@@ -169,14 +169,17 @@ recovery, SIGHUP reload and authenticated `/readyz` and `/v1/status` diagnostics
 docker run --rm --cap-drop ALL --security-opt no-new-privileges \
   -p 127.0.0.1:8080:8080 \
   --mount type=bind,src=/absolute/operator-config,dst=/etc/moenotes,readonly \
-  ghcr.io/luoxiadesu/moenotes-api:0.1.0-alpha.3
+  --mount type=bind,src=/absolute/accounts,dst=/accounts,readonly \
+  --mount type=bind,src=/absolute/state,dst=/var/lib/moenotes \
+  ghcr.io/luoxiadesu/moenotes-api:0.1.0-alpha.4
 ```
 
 Set the mounted config's `listen` to `0.0.0.0:8080` inside the container. The image
 runs as UID/GID 65532; grant that user access to the config and private secret files
 without making secrets group/world-readable. Mount only the necessary directory.
-For managed login/recovery, additionally mount `login.state_dir` read-write with
-owner-only permissions and UID 65532 ownership; keep configuration mounted read-only.
+The example uses the template's `login.state_dir=/var/lib/moenotes`; initialize
+the host state/account directories with mode 0700 and UID 65532 ownership, and
+config/account files with mode 0600. Keep configuration and accounts read-only.
 Use a TLS reverse proxy before exposing HTTP remotely; TLS termination, firewalling
 and operator key rotation are deployment responsibilities. No permissive CORS or
 remote credential-management endpoint is included.

@@ -7,7 +7,7 @@ environment variables, logs or saved session state. The optional
 
 ## Configuration
 
-For unreleased source, [single-file configuration](configuration.md) consolidates
+Since `0.1.0-alpha.4`, [single-file configuration](configuration.md) consolidates
 the HTTP key, device context and SDK parameters into `config.toml`. The file-based
 examples below remain compatible. Account passwords still belong in `/accounts`.
 

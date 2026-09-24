@@ -1,6 +1,6 @@
 # Validation Record
 
-## Unreleased Single-File Configuration
+## Alpha.4 Single-File Configuration
 
 2026-09-25: 98 Rust tests (36 client, 3 protocol, 52 server unit, 7 process
 integration), two doctests, seven release-script tests, fmt, all-target Clippy,
@@ -15,7 +15,9 @@ fields, SDK omissions vs. empty strings, TOML-to-legacy JSON equivalence and
 startup/health/status/reload without login. Existing mock role-login tests also
 exercise inline device context. No production SDK/game requests were made.
 Account passwords remain exclusively in `/accounts`; snapshots and the HTTP v1
-contract are unchanged. This increment is not in the published alpha.3 image.
+contract are unchanged. Main-branch CI for commit `ec797a4` passed both native
+architectures and all five container smoke configurations (run `36032528479`).
+Release publication requires the versioned main/tag gates in [releasing](releasing.md).
 
 ## Alpha.3 Account Directory and Health Bootstrap
 

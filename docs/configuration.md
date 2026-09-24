@@ -1,7 +1,7 @@
 # Single-File Configuration
 
-This is an **unreleased source feature**, not part of the alpha.3 image. All manually
-entered server, region, device and SDK settings can live in `config.toml`.
+Since `0.1.0-alpha.4`, all manually entered server, region, device and SDK settings
+can live in `config.toml`. Older images require the legacy file-based settings.
 Account passwords remain in `/accounts/*.json`; session snapshots remain in a
 persistent writable state directory. No passwords are accepted in the config.
 

@@ -47,18 +47,18 @@ Use focused Conventional Commit messages (`feat:`, `fix:`, `docs:`, `ci:`,
 `chore(release):`). From a clean, reviewed `main`:
 
 ```sh
-python3 scripts/release.py --tag v0.1.0-alpha.3
+python3 scripts/release.py --tag v0.1.0-alpha.4
 git push origin main
 # Wait for the main-branch Build and Release workflow to pass.
-git tag -a v0.1.0-alpha.3 -m "Release v0.1.0-alpha.3"
-git push origin v0.1.0-alpha.3
+git tag -a v0.1.0-alpha.4 -m "Release v0.1.0-alpha.4"
+git push origin v0.1.0-alpha.4
 ```
 
 Only tag runs log in to GHCR and push tested per-architecture images by digest.
 After both pass, the release job assembles and verifies the multi-platform index,
 then publishes the GitHub Release with `image-digests.json`. Tags are:
 
-- `ghcr.io/luoxiadesu/moenotes-api:0.1.0-alpha.3` (exact version).
+- `ghcr.io/luoxiadesu/moenotes-api:0.1.0-alpha.4` (exact version).
 - `ghcr.io/luoxiadesu/moenotes-api:sha-<full-40-character-commit>` (source revision).
 - `ghcr.io/luoxiadesu/moenotes-api@sha256:<index-digest>` (immutable content).
 

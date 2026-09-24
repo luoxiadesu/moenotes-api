@@ -6,7 +6,7 @@ claimed. Use only accounts and upstream services you are authorized to access.
 
 ## Deployment
 
-- Inline configuration (unreleased) makes `config.toml` a secret file: use owner-only
+- Inline configuration makes `config.toml` a secret file: use owner-only
   Unix permissions and a read-only mount. HTTP keys and SDK AppKeys must not enter
   images, logs or Git. Account passwords remain exclusively in `/accounts`.
 

@@ -1,4 +1,4 @@
-# Single-file configuration (unreleased; requires a source build).
+# Single-file configuration (available since 0.1.0-alpha.4).
 # Blank settings keep `serve` health-only. Fill with authorized values.
 # Protect populated config with mode 0600 and container UID 65532 ownership.
 # Account passwords stay ONLY in /accounts/*.json, never in this file.

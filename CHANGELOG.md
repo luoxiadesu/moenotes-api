@@ -2,7 +2,7 @@
 
 Version numbers follow MAJOR.MINOR.PATCH. Pre-release APIs are experimental.
 
-## Unreleased
+## 0.1.0-alpha.4 - 2026-09-25
 
 - Support inline `api_key`, `[login.context]` and `[login.sdk_http]` in one private
   config file; preserve legacy file sources and reject conflicting sources.
