@@ -2,7 +2,26 @@
 
 Version numbers follow MAJOR.MINOR.PATCH. Pre-release APIs are experimental.
 
-## Unreleased
+## 0.1.0-alpha.3 - 2026-09-25
+
+- Add an opt-in lazy `/accounts` email/password JSON source. Health/status and
+  startup never load account passwords or trigger login. Missing files remain live;
+  protected queries initialize one selected account/region with single-flight.
+- Check regional role existence before login; automatically create only missing
+  roles by default, with an option to disable creation. Require SDK-readiness
+  confirmation, isolate persisted state, reuse saved sessions and never replay the
+  triggering query or loop on unchanged failed inputs. Add SIGHUP rearming.
+- Validate account-file schema, private permissions, selection and size bounds;
+  keep passwords outside logs/snapshots and reject implicit account switching.
+
+- Keep an unconfigured server/container alive in health-only mode. `/health` and
+  `/healthz` return 200 without initializing or probing upstream clients. Log all
+  missing required fields/files by name; business and readiness routes return 503.
+- Preserve strict `check-config` validation and reject malformed configuration or
+  unsafe API-key files. Add empty-container startup and graceful-shutdown checks.
+- Reject dangling/nonregular session pointers before any login, and preserve the
+  initialization failure category across repeated queries with unchanged inputs.
+- Keep the existing HTTP `/v1` routes, query parameters and response contract.
 
 ## 0.1.0-alpha.2 - 2026-09-24
 

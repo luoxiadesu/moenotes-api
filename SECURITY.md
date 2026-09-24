@@ -24,7 +24,12 @@ claimed. Use only accounts and upstream services you are authorized to access.
 - Explicit SDK/session snapshots are plaintext secret files, not an encrypted vault.
   Unix writes require a private parent directory and never replace existing files;
   keep backups and their parent paths private as well. Windows ACL-based saving is
-  not implemented. Passwords are never persisted. Opt-in recovery persists rotated
+  not implemented. The program never writes passwords. Optional `/accounts` files
+  are operator-provided plaintext password storage: mount them read-only and protect
+  their parent directory. With `[accounts]`, a bearer-authorized query can initiate
+  SDK/game login and create a missing regional role by default. Enable only with
+  account-owner authorization; set `allow_create=false` to reject missing roles.
+  Opt-in recovery persists rotated
   game credentials; use a dedicated account and a private writable state directory.
 
 ## Dependency Advisory Review

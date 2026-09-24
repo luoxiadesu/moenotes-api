@@ -1,6 +1,7 @@
 /target/
 /config.toml
 /secrets/
+/accounts/
 *.pem
 .env
 __pycache__/

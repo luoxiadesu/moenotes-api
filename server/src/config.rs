@@ -19,6 +19,7 @@ pub struct Config {
     #[serde(default = "yes")]
     pub access_log: bool,
     pub login: Option<LoginConfig>,
+    pub accounts: Option<crate::accounts::AccountsConfig>,
     #[serde(default)]
     pub recovery: RecoveryConfig,
     pub api_key_file: PathBuf,
@@ -79,7 +80,11 @@ fn entries() -> usize {
 impl Config {
     pub fn read(path: &Path) -> Result<Self, ClientError> {
         let text = std::fs::read_to_string(path).map_err(|_| invalid())?;
-        let mut config: Self = toml::from_str(&text).map_err(|_| invalid())?;
+        Self::from_text(&text, path)
+    }
+
+    pub(crate) fn from_text(text: &str, path: &Path) -> Result<Self, ClientError> {
+        let mut config: Self = toml::from_str(text).map_err(|_| invalid())?;
         if config.cache_capacity > 16384
             || config.cache_ttl_seconds > 3600
             || config.minimum_interval_ms > 60000
@@ -90,6 +95,12 @@ impl Config {
             || config.recovery.cooldown_seconds > 86400
             || config.recovery.enabled && config.login.is_none()
             || config.login.is_some() && config.credentials_file.is_some()
+            || config.accounts.is_some() && config.login.is_none()
+            || config.accounts.is_some()
+                && config
+                    .login
+                    .as_ref()
+                    .is_some_and(|l| l.sdk_http_file.is_none())
             || config.enable_experimental_raw
                 && config.response_mode.is_some_and(|m| m != ResponseMode::Raw)
         {
@@ -116,6 +127,12 @@ impl Config {
                 && file.is_relative()
             {
                 *file = parent.join(&*file);
+            }
+        }
+        if let Some(accounts) = &mut config.accounts {
+            accounts.validate()?;
+            if accounts.directory.is_relative() {
+                accounts.directory = parent.join(&accounts.directory);
             }
         }
         Ok(config)

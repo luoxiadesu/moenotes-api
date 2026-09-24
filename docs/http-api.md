@@ -15,7 +15,10 @@ callers use that same upstream identity; API keys are not game credentials.
 
 ## Access and Data Boundary
 
-`GET /healthz` is unauthenticated and reports process liveness, not upstream health.
+`GET /health` and `GET /healthz` are unauthenticated and report process liveness,
+not upstream health. Missing required configuration starts a health-only service:
+both return 200, while readiness/business URLs return 503 `unconfigured`. No
+upstream clients or calls are created in that mode. See [startup](operations.md#missing-configuration).
 `GET /openapi.json` requires a bearer API key and describes the experimental routes
 even when disabled. Query routes always require `Authorization: Bearer ...`.
 `response_mode` defaults to `public`; `raw` is a trusted-operator opt-in and

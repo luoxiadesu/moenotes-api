@@ -1,4 +1,5 @@
 //! Experimental HTTP gateway. Raw account-dependent data is opt-in, not public-safe.
+pub mod accounts;
 pub mod cache;
 pub mod config;
 mod diagnostics;
@@ -7,6 +8,7 @@ mod openapi;
 pub mod operator;
 pub mod projection;
 mod query_params;
+pub mod startup;
 
 use axum::{
     Json, Router,
@@ -164,10 +166,8 @@ pub fn router_with_options(
         .layer(DefaultBodyLimit::max(0))
         .route_layer(middleware::from_fn_with_state(state.clone(), authenticate));
     Ok(Router::new()
-        .route(
-            "/healthz",
-            get(|| async { Json(serde_json::json!({"status":"ok"})) }),
-        )
+        .route("/health", get(startup::health))
+        .route("/healthz", get(startup::health))
         .merge(protected)
         .with_state(state.clone())
         .layer(middleware::from_fn_with_state(state, diagnose)))

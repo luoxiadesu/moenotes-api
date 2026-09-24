@@ -90,7 +90,7 @@ pub(crate) fn private_read(path: &Path) -> Result<Zeroizing<Vec<u8>>, ClientErro
         Ok(value)
     }
 }
-fn private_dir(path: &Path) -> Result<(), ClientError> {
+pub(crate) fn private_dir(path: &Path) -> Result<(), ClientError> {
     let meta = fs::symlink_metadata(path).map_err(|_| invalid())?;
     if !meta.is_dir() {
         return Err(invalid());
@@ -195,13 +195,10 @@ impl LoginConfig {
         &self,
         config: &SessionConfig,
     ) -> Result<Option<StaticCredentials>, ClientError> {
-        if !self
-            .state_dir
-            .join("current.json")
-            .try_exists()
-            .map_err(|_| invalid())?
-        {
-            return Ok(None);
+        match fs::symlink_metadata(self.state_dir.join("current.json")) {
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Ok(meta) if meta.is_file() => {}
+            _ => return Err(invalid()),
         }
         let p = self.pointer(config)?;
         StaticCredentials::from_file(&self.state_dir.join(p.game_file)).map(Some)
@@ -263,7 +260,7 @@ fn sdk_client(path: &Path) -> Result<(SdkHttpClient, u32), ClientError> {
 pub async fn sdk_login(
     config: &SessionConfig,
     login: &LoginConfig,
-    mut email: String,
+    email: String,
     password: Zeroizing<String>,
 ) -> Result<(), String> {
     login
@@ -272,6 +269,31 @@ pub async fn sdk_login(
     let _lock = login
         .lock()
         .map_err(|_| "another authentication operation is active")?;
+    let sdk =
+        password_authorization(config, login, email, password, CancellationToken::new()).await?;
+    save_pending(login, &sdk)?;
+    Ok(())
+}
+
+fn save_pending(login: &LoginConfig, sdk: &SdkAuthorization) -> Result<(), String> {
+    let file = format!("pending-{}.json", uuid::Uuid::new_v4());
+    sdk.save_to_file(&login.state_dir.join(&file))
+        .map_err(|_| "SDK snapshot failed")?;
+    publish(
+        &login.state_dir.join("pending.json"),
+        &serde_json::to_vec(&serde_json::json!({"file":file})).unwrap(),
+    )
+    .map_err(|_| "SDK pointer failed")?;
+    Ok(())
+}
+
+pub(crate) async fn password_authorization(
+    config: &SessionConfig,
+    login: &LoginConfig,
+    mut email: String,
+    password: Zeroizing<String>,
+    cancel: CancellationToken,
+) -> Result<SdkAuthorization, String> {
     let (client, country_id) = sdk_client(
         login
             .sdk_http_file
@@ -279,7 +301,7 @@ pub async fn sdk_login(
             .ok_or("sdk_http_file required")?,
     )
     .map_err(|_| "invalid SDK HTTP configuration")?;
-    let rsa = match client.fetch_rsa(None, CancellationToken::new()).await {
+    let rsa = match client.fetch_rsa(None, cancel.clone()).await {
         Ok(SdkReply::Success(value)) => value,
         Ok(SdkReply::Rejected(value)) => return Err(format!("SDK RSA rejected: {}", value.code())),
         Err(e) => return Err(format!("SDK RSA failed: {:?}", e.kind)),
@@ -291,9 +313,7 @@ pub async fn sdk_login(
         ticket: None,
         third_payment_voucher: None,
     };
-    let reply = client
-        .password_login(&rsa, &request, None, CancellationToken::new())
-        .await;
+    let reply = client.password_login(&rsa, &request, None, cancel).await;
     drop(request);
     drop(password);
     let user = match reply {
@@ -325,15 +345,7 @@ pub async fn sdk_login(
     );
     let sdk = SdkAuthorization::from_callback_json(config, &bytes)
         .map_err(|_| "SDK callback rejected")?;
-    let file = format!("pending-{}.json", uuid::Uuid::new_v4());
-    sdk.save_to_file(&login.state_dir.join(&file))
-        .map_err(|_| "SDK snapshot failed")?;
-    publish(
-        &login.state_dir.join("pending.json"),
-        &serde_json::to_vec(&serde_json::json!({"file":file})).unwrap(),
-    )
-    .map_err(|_| "SDK pointer failed")?;
-    Ok(())
+    Ok(sdk)
 }
 
 pub async fn game_login(

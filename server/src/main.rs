@@ -1,6 +1,7 @@
 use moenotes_client::{CancellationToken, Client, CredentialProvider, StaticCredentials};
 use moenotes_server::{
     RouterOptions,
+    accounts::AccountDirectoryClient,
     cache::CacheOptions,
     config::{Config, read_api_key},
     managed::{GameRecovery, ManagedClient, Recovery},
@@ -30,13 +31,32 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     }
     if matches!(command.as_str(), "help" | "--help") {
         println!(
-            "moenotes-server <serve|check-config|sdk-login|game-login|auth-status> <config.toml>\nsdk-login: --password-stdin reads one private JSON object, otherwise prompts without password echo\ngame-login: --confirm-sdk-ready [--allow-create]\nSIGHUP: reload current saved game session, never log in.\nmoenotes-server --version"
+            "moenotes-server <serve|check-config|sdk-login|game-login|auth-status> <config.toml>\nsdk-login: --password-stdin reads one private JSON object, otherwise prompts without password echo\ngame-login: --confirm-sdk-ready [--allow-create]\nSIGHUP: reload saved session, or reset lazy accounts loading; never log in on the signal.\nmoenotes-server --version"
         );
         return Ok(());
     }
     let path = args.next().ok_or("configuration path required")?;
     let flags: Vec<_> = args.collect();
-    let config = Config::read(Path::new(&path))?;
+    let config = if command == "serve" {
+        if !flags.is_empty() {
+            return Err("unexpected argument".into());
+        }
+        let fallback = std::env::var("MOENOTES_BOOTSTRAP_LISTEN")
+            .unwrap_or_else(|_| "127.0.0.1:8080".into())
+            .parse()
+            .map_err(|_| "invalid MOENOTES_BOOTSTRAP_LISTEN")?;
+        match moenotes_server::startup::inspect(Path::new(&path), fallback)? {
+            moenotes_server::startup::Startup::Configured(config) => *config,
+            moenotes_server::startup::Startup::Unconfigured { listen, missing } => {
+                return moenotes_server::startup::serve(listen, &missing).await;
+            }
+        }
+    } else {
+        Config::read(Path::new(&path))?
+    };
+    if config.accounts.is_some() && matches!(command.as_str(), "sdk-login" | "game-login") {
+        return Err("accounts mode uses lazy login; use a separate configuration without [accounts] for manual operator login".into());
+    }
     match command.as_str() {
         "sdk-login" => {
             if flags.iter().any(|f| f != "--password-stdin") {
@@ -108,7 +128,9 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     if let Some(login) = &config.login {
         login.validate(&config.session)?;
     }
-    let provider = if let Some(login) = &config.login {
+    let provider = if config.accounts.is_some() {
+        None
+    } else if let Some(login) = &config.login {
         login.credentials(&config.session)?
     } else {
         config
@@ -131,26 +153,47 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     if command == "auth-status" {
         println!(
             "{}",
-            serde_json::json!({"session":format!("{:?}",client.session_status()),"recovery_enabled":config.recovery.enabled,"network_checked":false})
+            serde_json::json!({"session":format!("{:?}",client.session_status()),"recovery_enabled":config.recovery.enabled,"accounts_enabled":config.accounts.is_some(),"network_checked":false})
         );
         return Ok(());
     }
     let stop = CancellationToken::new();
+    let accounts = config
+        .accounts
+        .clone()
+        .map(|accounts| {
+            AccountDirectoryClient::new(
+                client.clone(),
+                accounts,
+                config.login.clone().unwrap(),
+                config.session.clone(),
+            )
+            .map(Arc::new)
+        })
+        .transpose()?;
     let recovery: Option<Arc<dyn Recovery>> = if config.recovery.enabled {
-        Some(Arc::new(GameRecovery {
-            client: client.clone(),
-            login: config.login.clone().unwrap(),
-            config: config.session.clone(),
-        }))
+        if let Some(accounts) = &accounts {
+            Some(accounts.clone())
+        } else {
+            Some(Arc::new(GameRecovery {
+                client: client.clone(),
+                login: config.login.clone().unwrap(),
+                config: config.session.clone(),
+            }))
+        }
     } else {
         None
     };
-    let managed = Arc::new(ManagedClient::new(
+    let mut managed = ManagedClient::new(
         client.clone(),
         recovery,
         Duration::from_secs(config.recovery.cooldown_seconds),
         stop.clone(),
-    ));
+    );
+    if let Some(accounts) = &accounts {
+        managed = managed.with_initial_loader(accounts.clone());
+    }
+    let managed = Arc::new(managed);
     let app = router_with_options(
         managed.clone(),
         read_api_key(&config.api_key_file)?,
@@ -171,6 +214,11 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
     let listener = tokio::net::TcpListener::bind(config.listen).await?;
+    if accounts.is_some() {
+        eprintln!(
+            "{{\"event\":\"account_source\",\"status\":\"deferred\",\"trigger\":\"first_authenticated_query\"}}"
+        );
+    }
     println!(
         "moenotes-api listening on {} (response mode: {:?})",
         listener.local_addr()?,
@@ -187,6 +235,11 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
             loop {
                 tokio::select! {_=stop_reload.cancelled()=>break,_=hup.recv()=>{
                     let success=managed.reload(||{
+                        if let Some(accounts)=&accounts {
+                            client.replace_session(config.session.clone(),None)?;
+                            accounts.reset();
+                            return Ok(());
+                        }
                         let loaded=if let Some(login)=&config.login{login.credentials(&config.session)}else{config.credentials_file.as_ref().map(|p|StaticCredentials::from_file(p)).transpose()};
                         loaded.and_then(|p|client.replace_session(config.session.clone(),p.as_ref().map(|p|p as &dyn CredentialProvider)))
                     }).is_ok();

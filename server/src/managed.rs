@@ -28,6 +28,7 @@ struct State {
     attempts: u64,
     successes: u64,
     attempted: Option<Generation>,
+    initial_attempted: Option<(Generation, Option<[u8; 32]>)>,
     last_attempt: Option<Instant>,
     last_error: Option<ErrorKind>,
 }
@@ -40,6 +41,10 @@ pub struct Status {
 }
 #[async_trait]
 pub trait Recovery: Send + Sync {
+    /// Local input change detection, only evaluated after a protected query fails.
+    fn input_revision(&self) -> Option<[u8; 32]> {
+        None
+    }
     async fn recover(
         &self,
         generation: Generation,
@@ -103,6 +108,7 @@ impl Recovery for GameRecovery {
 pub struct ManagedClient {
     inner: Arc<dyn QueryClient>,
     recovery: Option<Arc<dyn Recovery>>,
+    initial_loader: Option<Arc<dyn Recovery>>,
     state: Arc<Mutex<State>>,
     cooldown: Duration,
     stop: CancellationToken,
@@ -117,17 +123,23 @@ impl ManagedClient {
         Self {
             inner,
             recovery,
+            initial_loader: None,
             state: Arc::new(Mutex::new(State {
                 phase: Phase::Unverified,
                 attempts: 0,
                 successes: 0,
                 attempted: None,
+                initial_attempted: None,
                 last_attempt: None,
                 last_error: None,
             })),
             cooldown,
             stop,
         }
+    }
+    pub fn with_initial_loader(mut self, loader: Arc<dyn Recovery>) -> Self {
+        self.initial_loader = Some(loader);
+        self
     }
     pub fn status(&self) -> Status {
         let s = self.state.lock().unwrap();
@@ -158,6 +170,7 @@ impl ManagedClient {
         replace()?;
         s.phase = Phase::Unverified;
         s.attempted = None;
+        s.initial_attempted = None;
         s.last_attempt = None;
         s.last_error = None;
         Ok(())
@@ -175,7 +188,21 @@ impl ManagedClient {
         if self.inner.generation() != generation {
             return;
         }
-        if s.phase == Phase::Recovering {
+        if matches!(s.phase, Phase::Recovering | Phase::PersistenceFailed) {
+            return;
+        }
+        let initial = result
+            .as_ref()
+            .is_err_and(|e| e.kind == ErrorKind::AuthenticationRequired);
+        // Keep the last worker failure visible until inputs actually change.
+        let initial_revision = if initial {
+            self.initial_loader
+                .as_ref()
+                .map(|loader| (generation, loader.input_revision()))
+        } else {
+            None
+        };
+        if initial_revision.is_some() && initial_revision == s.initial_attempted {
             return;
         }
         match result {
@@ -197,23 +224,35 @@ impl ManagedClient {
                         return;
                     }
                 }
-                if e.kind != ErrorKind::Authentication {
+                if !matches!(
+                    e.kind,
+                    ErrorKind::Authentication | ErrorKind::AuthenticationRequired
+                ) {
                     return;
                 }
             }
         }
-        let Some(recovery) = self.recovery.clone() else {
+        let Some(recovery) = (if initial {
+            &self.initial_loader
+        } else {
+            &self.recovery
+        })
+        .clone() else {
             return;
         };
-        if s.attempted == Some(generation)
-            || s.last_attempt.is_some_and(|t| t.elapsed() < self.cooldown)
-        {
-            return;
+        if initial {
+            s.initial_attempted = initial_revision;
+        } else {
+            if s.attempted == Some(generation)
+                || s.last_attempt.is_some_and(|t| t.elapsed() < self.cooldown)
+            {
+                return;
+            }
+            s.attempted = Some(generation);
+            s.last_attempt = Some(Instant::now());
         }
         s.phase = Phase::Recovering;
-        s.attempted = Some(generation);
         s.attempts += 1;
-        s.last_attempt = Some(Instant::now());
         let state = self.state.clone();
         let inner = self.inner.clone();
         let stop = self.stop.child_token();
@@ -224,7 +263,11 @@ impl ManagedClient {
             let mut s = state.lock().unwrap();
             match result {
                 Ok(()) => {
-                    s.phase = Phase::Recovered;
+                    s.phase = if initial {
+                        Phase::Unverified
+                    } else {
+                        Phase::Recovered
+                    };
                     s.successes += 1;
                     s.last_error = None;
                 }
@@ -235,7 +278,7 @@ impl ManagedClient {
                         match e.kind {
                             ErrorKind::Version => Phase::VersionBlocked,
                             ErrorKind::DeviceConflict => Phase::DeviceConflict,
-                            ErrorKind::InvalidConfig => Phase::PersistenceFailed,
+                            ErrorKind::InvalidConfig if !initial => Phase::PersistenceFailed,
                             _ => Phase::ReauthenticationRequired,
                         }
                     };
@@ -244,7 +287,7 @@ impl ManagedClient {
             }
             eprintln!(
                 "{}",
-                serde_json::json!({"event":"session_recovery","phase":s.phase,"attempts":s.attempts,"successes":s.successes,"error":s.last_error})
+                serde_json::json!({"event":if initial {"account_initialization"} else {"session_recovery"},"phase":s.phase,"attempts":s.attempts,"successes":s.successes,"error":s.last_error})
             );
         });
     }
@@ -292,6 +335,155 @@ impl QueryClient for ManagedClient {
 mod tests {
     use super::*;
     use std::sync::atomic::{AtomicUsize, Ordering};
+    struct Initial {
+        reads: AtomicUsize,
+        attempts: AtomicUsize,
+        revision: AtomicUsize,
+        gate: tokio::sync::Notify,
+    }
+    #[async_trait]
+    impl Recovery for Initial {
+        fn input_revision(&self) -> Option<[u8; 32]> {
+            self.reads.fetch_add(1, Ordering::SeqCst);
+            Some([self.revision.load(Ordering::SeqCst) as u8; 32])
+        }
+        async fn recover(&self, _: Generation, _: CancellationToken) -> Result<(), ClientError> {
+            self.attempts.fetch_add(1, Ordering::SeqCst);
+            self.gate.notified().await;
+            Err(ClientError::new(ErrorKind::InvalidConfig))
+        }
+    }
+    fn initial() -> Arc<Initial> {
+        Arc::new(Initial {
+            reads: AtomicUsize::new(0),
+            attempts: AtomicUsize::new(0),
+            revision: AtomicUsize::new(0),
+            gate: tokio::sync::Notify::new(),
+        })
+    }
+    #[tokio::test]
+    async fn health_status_ready_and_anonymous_errors_never_read_accounts() {
+        use axum::{body::Body, http::Request};
+        use tower::ServiceExt;
+        let loader = initial();
+        let stop = CancellationToken::new();
+        let managed = Arc::new(
+            ManagedClient::new(
+                Arc::new(Failing {
+                    generation: Generation::new_v4(),
+                    kind: ErrorKind::AuthenticationRequired,
+                }),
+                None,
+                Duration::ZERO,
+                stop.clone(),
+            )
+            .with_initial_loader(loader.clone()),
+        );
+        let app = crate::router_with_options(
+            managed.clone(),
+            zeroize::Zeroizing::new("synthetic-account-api-key-1234567890".into()),
+            crate::RouterOptions {
+                mode: crate::projection::ResponseMode::Public,
+                managed: Some(managed.clone()),
+                access_log: false,
+            },
+            Default::default(),
+            stop.clone(),
+        )
+        .unwrap();
+        for (path, status) in [
+            ("/health", 200),
+            ("/healthz", 200),
+            ("/readyz", 503),
+            ("/v1/status", 200),
+            ("/v1/announcements", 503),
+        ] {
+            let response = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .uri(path)
+                        .header(
+                            "authorization",
+                            "Bearer synthetic-account-api-key-1234567890",
+                        )
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(response.status().as_u16(), status);
+        }
+        assert!(!managed.ready());
+        assert_eq!(loader.reads.load(Ordering::SeqCst), 0);
+        assert_eq!(loader.attempts.load(Ordering::SeqCst), 0);
+        stop.cancel();
+    }
+    #[tokio::test]
+    async fn lazy_load_is_single_flight_and_rearmed_only_by_input_change_or_reload() {
+        let loader = initial();
+        let managed = Arc::new(
+            ManagedClient::new(
+                Arc::new(Failing {
+                    generation: Generation::new_v4(),
+                    kind: ErrorKind::AuthenticationRequired,
+                }),
+                None,
+                Duration::from_secs(300),
+                CancellationToken::new(),
+            )
+            .with_initial_loader(loader.clone()),
+        );
+        let mut tasks = Vec::new();
+        for _ in 0..16 {
+            let managed = managed.clone();
+            tasks.push(tokio::spawn(async move {
+                managed
+                    .execute(
+                        managed.generation(),
+                        Query::Whoami(Default::default()),
+                        CancellationToken::new(),
+                    )
+                    .await
+            }));
+        }
+        for task in tasks {
+            assert!(task.await.unwrap().is_err());
+        }
+        tokio::task::yield_now().await;
+        assert_eq!(loader.attempts.load(Ordering::SeqCst), 1);
+        assert!(managed.reload(|| Ok(())).is_err());
+        loader.gate.notify_one();
+        managed.wait_idle().await;
+        assert_eq!(managed.status().phase, Phase::ReauthenticationRequired);
+        for _ in 0..4 {
+            assert!(managed.query_error(false).is_none());
+            let _ = managed
+                .execute(
+                    managed.generation(),
+                    Query::Whoami(Default::default()),
+                    CancellationToken::new(),
+                )
+                .await;
+        }
+        assert_eq!(loader.attempts.load(Ordering::SeqCst), 1);
+        assert_eq!(managed.status().last_error, Some(ErrorKind::InvalidConfig));
+        loader.revision.store(1, Ordering::SeqCst);
+        for expected in [2, 3] {
+            let _ = managed
+                .execute(
+                    managed.generation(),
+                    Query::Whoami(Default::default()),
+                    CancellationToken::new(),
+                )
+                .await;
+            tokio::task::yield_now().await;
+            assert_eq!(loader.attempts.load(Ordering::SeqCst), expected);
+            loader.gate.notify_one();
+            managed.wait_idle().await;
+            managed.reload(|| Ok(())).unwrap();
+        }
+    }
     struct Rotating {
         generation: std::sync::RwLock<Generation>,
         valid: std::sync::atomic::AtomicBool,

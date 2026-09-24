@@ -46,8 +46,8 @@ Release images are published to the public GitHub Container Registry package
 is required to pull public images:
 
 ```sh
-docker pull ghcr.io/luoxiadesu/moenotes-api:0.1.0-alpha.2
-docker run --rm --network none ghcr.io/luoxiadesu/moenotes-api:0.1.0-alpha.2 --version
+docker pull ghcr.io/luoxiadesu/moenotes-api:0.1.0-alpha.3
+docker run --rm --network none ghcr.io/luoxiadesu/moenotes-api:0.1.0-alpha.3 --version
 ```
 
 Use an exact version or the immutable digest listed in the GitHub Release.
@@ -125,6 +125,20 @@ cargo run --locked -p moenotes-server -- serve config.toml
 The default bind address is `127.0.0.1:8080`. `/healthz` reports process liveness
 only. `/openapi.json` requires `Authorization: Bearer <HTTP_API_KEY>`.
 
+Since `0.1.0-alpha.3`, missing configuration starts a
+health-only listener instead of exiting. `/health` and `/healthz` return 200 without
+upstream checks; logs list missing configuration keys, and business routes remain
+unavailable (503). The image's bootstrap listener is `0.0.0.0:8080`. Fill in the
+configuration and restart. `check-config` remains strict;
+see [operations](docs/operations.md#missing-configuration).
+
+The server also supports optional lazy `/accounts` loading from private
+`{"user":"EMAIL","password":"PASSWORD"}` JSON files. The first protected query
+loads a persisted session or logs in, creating a regional role only if pre-login
+reports none. Health/status never trigger login; missing accounts leave health at
+200. One account/region is selected per instance. See [account directory setup](docs/accounts.md)
+for permissions, SDK-readiness confirmation, selection and retry behavior.
+
 Query routes accept
 GET requests with query parameters and no body. Example request:
 
@@ -138,7 +152,7 @@ parameter names; IDs are decimal text. The response is un-enriched protobuf JSON
 integers represented as decimal strings. Fetch time and cache status are headers.
 See [HTTP API](docs/http-api.md) for all routes, limits and error meanings.
 
-This release removes the old POST `/experimental/v1/...` routes. The upstream game
+Since alpha.2, the old POST `/experimental/v1/...` routes are removed. The upstream game
 protocol remains gRPC, not HTTP GET. See [operations](docs/operations.md) for login,
 recovery, SIGHUP reload and authenticated `/readyz` and `/v1/status` diagnostics.
 
@@ -148,7 +162,7 @@ recovery, SIGHUP reload and authenticated `/readyz` and `/v1/status` diagnostics
 docker run --rm --cap-drop ALL --security-opt no-new-privileges \
   -p 127.0.0.1:8080:8080 \
   --mount type=bind,src=/absolute/operator-config,dst=/etc/moenotes,readonly \
-  ghcr.io/luoxiadesu/moenotes-api:0.1.0-alpha.2
+  ghcr.io/luoxiadesu/moenotes-api:0.1.0-alpha.3
 ```
 
 Set the mounted config's `listen` to `0.0.0.0:8080` inside the container. The image
@@ -169,6 +183,7 @@ smoke-tests each native Linux image before publishing. See [releasing](docs/rele
 
 - [Client, authentication and error model](docs/client.md)
 - [Operator login, recovery and diagnostics](docs/operations.md)
+- [Lazy account directory](docs/accounts.md)
 - [API stability and migration](docs/api-stability.md)
 - [SDK-to-game login and analysis boundaries](docs/sdk-login.md)
 - [SDK HTTP login primitives and encoding](docs/sdk-http.md)

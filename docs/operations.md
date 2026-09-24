@@ -2,9 +2,40 @@
 
 Use a dedicated account: login and recovery may invalidate another device's session.
 There is no HTTP login endpoint. Passwords never enter command-line arguments,
-environment variables, logs or saved state.
+environment variables, logs or saved session state. The optional
+[account directory](accounts.md) reads operator-provided plaintext password files.
 
 ## Configuration
+
+### Missing Configuration
+
+`serve` starts in **health-only mode** when the config file, required fields or
+explicitly referenced files are missing. It creates no game/SDK client and performs
+no authentication, recovery or upstream self-check. `/health` and `/healthz` both
+return HTTP 200 with `{"status":"ok"}`. `/readyz` returns 503 with
+`{"ready":false,"configured":false}`; all other URLs return 503 with the generic
+error `unconfigured`, without exposing configuration details or business data.
+
+A structured `configuration_missing` startup warning lists missing field names,
+not values. For a completely empty deployment the list includes `config_file`,
+`api_key_file`, `session.region`, `session.origin`, `session.allowed_origins`,
+`session.platform` and `session.client_version`. Blank fields/allowlists and empty
+API-key files count as missing. Optional settings are not reported unless they are
+explicitly configured or needed by an enabled login section.
+
+The image uses `0.0.0.0:8080` for this mode so container health probes can reach it.
+Native binaries default to `127.0.0.1:8080`. `MOENOTES_BOOTSTRAP_LISTEN` overrides
+this fallback, and a `listen` value in a partial config takes precedence. Complete
+configs retain their normal listen settings, independent of the bootstrap address.
+There is no image `HEALTHCHECK` or game-availability probe; configure the deployment
+platform's liveness probe to `/health` or `/healthz`, not `/readyz`.
+
+Supply the missing configuration and **restart** to activate business routes.
+SIGHUP in health-only mode only logs `restart_required`. `check-config`, login and
+auth commands remain strict and exit nonzero when required configuration is absent.
+Malformed TOML, invalid field types and unsafe/invalid nonempty API-key files are
+errors, not a reason to weaken authentication. An absent optional game credential
+source is still a valid anonymous configuration, not a missing-config error.
 
 Start from `config.example.toml`. Choose one credential source: `credentials_file`
 for static game credentials, or `[login]` for managed state. Paths are relative to
@@ -91,6 +122,11 @@ extract APK/device configuration or ship an AppKey. See [SDK HTTP](sdk-http.md).
 
 ## Login
 
+This section describes manual CLI login without `[accounts]`. To load private
+`/accounts/*.json` files lazily, see [Lazy Account Directory](accounts.md). That
+mode defaults to automatic missing-role creation, subject to pre-login, whereas
+manual CLI login still requires `--allow-create`.
+
 ```sh
 moenotes-server check-config config.toml
 moenotes-server sdk-login config.toml
@@ -141,9 +177,13 @@ generation. Reload is rejected while recovery runs. Static credential files can
 also be replaced by the operator and reloaded this way. `auth-status` is offline;
 credential presence does not establish upstream validity.
 
+The preceding manual CLI instructions do not apply to `[accounts]`: SIGHUP in
+that mode unloads the session and rearms the first protected query, without
+logging in on the signal. See [accounts recovery](accounts.md#reload-and-recovery).
+
 ## Diagnostics
 
-- `GET /healthz`: unauthenticated liveness only.
+- `GET /health` and `GET /healthz`: unauthenticated liveness only; neither queries upstream.
 - `GET /readyz`: authenticated 200 after observed authenticated success or completed
   recovery, absent local blocks; otherwise 503. Not a periodic health/expiry probe.
 - `GET /v1/status`: authenticated version, response mode, phase, recovery counts,

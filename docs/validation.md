@@ -1,5 +1,31 @@
 # Validation Record
 
+## Alpha.3 Account Directory and Health Bootstrap
+
+2026-09-25: 91 Rust tests (36 client, 3 protocol, 47 server unit, 5 process
+integration), two doctests and seven release-script tests passed. Formatting,
+all-target Clippy with warnings denied and documentation generation passed.
+A local amd64 Docker build reused the cargo-chef dependency layer and passed
+smoke tests for missing configuration, normal configuration and empty accounts.
+All temporary server processes/containers were stopped. Publication is gated by
+the main-branch and tag workflows described in [releasing](releasing.md).
+
+New coverage includes missing/invalid/ambiguous/private account files, size and
+directory-scan bounds, account/region state isolation, password redaction,
+no account reads on startup/health/status/readiness, concurrent lazy loading,
+input-change/SIGHUP rearming, no request replay, saved-session reuse, existing vs.
+missing roles, pre-login failure, opted-in recovery and post-login persistence
+failure. SDK HTTP primitives retain their loopback regression coverage; the new
+directory orchestration uses synthetic saved SDK authorization and mock game
+transport. No real password, new online login or additional live role creation
+was used to verify this increment. Live end-to-end directory login is not claimed.
+
+Pre-release review reproduced and fixed dangling state pointers initiating login
+and repeated unloaded queries hiding the initialization failure category. Both
+regressions fail on the previous implementation and pass with the fixes.
+The HTTP v1 contract snapshot is unchanged. Configuration examples and lifecycle
+details are in [Lazy Account Directory](accounts.md).
+
 ## Alpha.2 Operations
 
 Pre-release checks passed: 70 Rust tests (36 client, 3 protocol, 28 server,

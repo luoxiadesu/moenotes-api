@@ -61,6 +61,7 @@ client_version = "1.0.1"
     let response = request(address, "/healthz");
     assert!(response.contains("200 OK"));
     assert!(response.contains("\"status\":\"ok\""));
+    assert!(request(address, "/health").contains("200 OK"));
     assert!(request(address, "/openapi.json").contains("401 Unauthorized"));
     assert!(request(address, "/v1/announcements").contains("404 Not Found"));
     #[cfg(unix)]

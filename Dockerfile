@@ -38,6 +38,8 @@ COPY --from=build /src/target/release/moenotes-server /usr/local/bin/moenotes-se
 COPY --from=inputs /LICENSE /usr/share/doc/moenotes-api/LICENSE
 COPY --from=inputs /proto/NOTICE.md /usr/share/doc/moenotes-api/PROTOCOL-NOTICE.md
 USER 65532:65532
+# Only used when configuration is missing; configured listen settings are unchanged.
+ENV MOENOTES_BOOTSTRAP_LISTEN=0.0.0.0:8080
 EXPOSE 8080
 ENTRYPOINT ["moenotes-server"]
 CMD ["serve", "/etc/moenotes/config.toml"]

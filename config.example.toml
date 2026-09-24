@@ -16,6 +16,15 @@ cache_capacity = 1024
 # sdk_http_file = "secrets/sdk-http.json"
 # state_dir = "secrets/state" # Existing writable directory, mode 0700.
 
+# Optional lazy email/password source; requires all three [login] paths above.
+# [accounts]
+# directory = "/accounts" # Optional; this is the default.
+# selected = "worker.json" # Required if more than one JSON file is present.
+# allow_create = true # Only when pre-login reports no role in session.region.
+# sdk_ready = true # Assert required official SDK consent/checks are complete.
+# Files: {"user":"EMAIL","password":"PASSWORD"}, mode 0600; directory mode 0700.
+# Health/status never load accounts. See docs/accounts.md before enabling.
+
 [recovery]
 enabled = false # Opt in: recovery may invalidate another device's session.
 cooldown_seconds = 300
