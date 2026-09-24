@@ -7,6 +7,10 @@ environment variables, logs or saved session state. The optional
 
 ## Configuration
 
+For unreleased source, [single-file configuration](configuration.md) consolidates
+the HTTP key, device context and SDK parameters into `config.toml`. The file-based
+examples below remain compatible. Account passwords still belong in `/accounts`.
+
 ### Missing Configuration
 
 `serve` starts in **health-only mode** when the config file, required fields or
@@ -37,7 +41,7 @@ Malformed TOML, invalid field types and unsafe/invalid nonempty API-key files ar
 errors, not a reason to weaken authentication. An absent optional game credential
 source is still a valid anonymous configuration, not a missing-config error.
 
-Start from `config.example.toml`. Choose one credential source: `credentials_file`
+For file-based deployment, use the example below. Choose one credential source: `credentials_file`
 for static game credentials, or `[login]` for managed state. Paths are relative to
 the config file. Managed example:
 

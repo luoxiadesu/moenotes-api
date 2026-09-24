@@ -344,7 +344,9 @@ mod tests {
         write(&context, br#"{"device_model":"synthetic","operating_system":"synthetic","device_identifier":"synthetic","global_channel_id":1,"brand_id":1,"area_id":1}"#);
         let login = LoginConfig {
             context_file: context,
+            context: None,
             sdk_http_file: None,
+            sdk_http: None,
             state_dir: dir.path().into(),
         };
         let config = SessionConfig {
@@ -547,7 +549,15 @@ mod tests {
             (false, true, 2),
             (false, false, 1),
         ] {
-            let (_dir, mut accounts, login, config) = setup();
+            let (_dir, mut accounts, mut login, config) = setup();
+            if exists {
+                login.context = Some(
+                    serde_json::from_slice(&operator::private_read(&login.context_file).unwrap())
+                        .unwrap(),
+                );
+                fs::remove_file(&login.context_file).unwrap();
+                login.context_file = PathBuf::new();
+            }
             accounts.allow_create = allow;
             put_account(&accounts);
             let (client, mock) = client(&config, exists, None);

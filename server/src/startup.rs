@@ -1,9 +1,10 @@
 //! Missing configuration permits liveness only, never anonymous business access.
-use crate::config::{Config, read_api_key};
+use crate::config::{
+    Config, check_inline_permissions, read_api_key, read_config, validate_api_key,
+};
 use axum::{Json, Router, http::StatusCode, middleware, routing::get};
 use moenotes_client::{ClientError, ErrorKind};
 use std::{
-    io::Read,
     net::SocketAddr,
     path::{Path, PathBuf},
 };
@@ -65,20 +66,8 @@ fn relative(value: &Value, key: &str, parent: &Path) -> Result<Option<PathBuf>, 
 
 pub fn inspect(path: &Path, fallback: SocketAddr) -> Result<Startup, ClientError> {
     let mut missing = Vec::new();
-    let text = match std::fs::File::open(path) {
-        Ok(file) => {
-            if !file.metadata().map_err(|_| invalid())?.is_file() {
-                return Err(invalid());
-            }
-            let mut text = Zeroizing::new(String::new());
-            file.take(65537)
-                .read_to_string(&mut text)
-                .map_err(|_| invalid())?;
-            if text.len() > 65536 {
-                return Err(invalid());
-            }
-            text
-        }
+    let text = match read_config(path) {
+        Ok(text) => text,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
             missing.push("config_file");
             Zeroizing::new(String::new())
@@ -91,12 +80,30 @@ pub fn inspect(path: &Path, fallback: SocketAddr) -> Result<Startup, ClientError
             return Err(invalid());
         }
     }
+    for table in ["login.context", "login.sdk_http", "login.sdk_http.common"] {
+        if field(&value, table).is_some_and(|v| !v.is_table()) {
+            return Err(invalid());
+        }
+    }
+    for (inline, file) in [
+        ("api_key", "api_key_file"),
+        ("login.context", "login.context_file"),
+        ("login.sdk_http", "login.sdk_http_file"),
+    ] {
+        if field(&value, inline).is_some() && field(&value, file).is_some() {
+            return Err(invalid());
+        }
+    }
+    check_inline_permissions(&value, path)?;
     let listen = match value.get("listen") {
         Some(Value::String(s)) => s.parse().map_err(|_| invalid())?,
         None => fallback,
         _ => return Err(invalid()),
     };
     for key in REQUIRED {
+        if *key == "api_key_file" && value.get("api_key").is_some() {
+            continue;
+        }
         let absent = if *key == "session.allowed_origins" {
             match field(&value, key) {
                 None => true,
@@ -115,22 +122,93 @@ pub fn inspect(path: &Path, fallback: SocketAddr) -> Result<Startup, ClientError
             missing.push(*key);
         }
     }
-    if value.get("login").is_some() {
+    if value.get("api_key").is_some() {
+        if string_missing(&value, "api_key")? {
+            missing.push("api_key");
+        } else {
+            validate_api_key(value["api_key"].as_str().ok_or_else(invalid)?)?;
+        }
+    }
+    if value.get("login").is_some() || value.get("accounts").is_some() {
         for key in ["login.context_file", "login.state_dir"] {
+            if key == "login.context_file" && field(&value, "login.context").is_some() {
+                continue;
+            }
             if string_missing(&value, key)? {
                 missing.push(key);
             }
         }
     }
-    if value.get("accounts").is_some() {
+    if value.get("accounts").is_some()
+        && field(&value, "login.sdk_http").is_none()
+        && string_missing(&value, "login.sdk_http_file")?
+    {
+        missing.push("login.sdk_http_file");
+    }
+    if field(&value, "login.context").is_some() {
         for key in [
-            "login.context_file",
-            "login.state_dir",
-            "login.sdk_http_file",
+            "login.context.device_model",
+            "login.context.operating_system",
+            "login.context.device_identifier",
         ] {
-            if string_missing(&value, key)? && !missing.contains(&key) {
+            if string_missing(&value, key)? {
                 missing.push(key);
             }
+        }
+        for key in [
+            "login.context.global_channel_id",
+            "login.context.brand_id",
+            "login.context.area_id",
+        ] {
+            match field(&value, key) {
+                None => missing.push(key),
+                Some(Value::Integer(n)) if u32::try_from(*n).is_ok() => {}
+                _ => return Err(invalid()),
+            }
+        }
+    }
+    if field(&value, "login.sdk_http").is_some() {
+        for key in ["login.sdk_http.base_url", "login.sdk_http.app_key"] {
+            if string_missing(&value, key)? {
+                missing.push(key);
+            }
+        }
+        match field(&value, "login.sdk_http.country_id") {
+            None => missing.push("login.sdk_http.country_id"),
+            Some(Value::Integer(n)) if u32::try_from(*n).is_ok() => {}
+            _ => return Err(invalid()),
+        }
+        match field(&value, "login.sdk_http.allowed_base_urls") {
+            None => missing.push("login.sdk_http.allowed_base_urls"),
+            Some(Value::Array(items)) if items.iter().all(Value::is_str) => {
+                if items.is_empty() || items.iter().all(|v| v.as_str().unwrap().trim().is_empty()) {
+                    missing.push("login.sdk_http.allowed_base_urls");
+                }
+            }
+            _ => return Err(invalid()),
+        }
+        let mut supplied = std::collections::BTreeSet::new();
+        if let Some(Value::Table(common)) = field(&value, "login.sdk_http.common") {
+            for (key, value) in common {
+                if !value.is_str() || !supplied.insert(key.as_str()) {
+                    return Err(invalid());
+                }
+            }
+        }
+        if let Some(omit) = field(&value, "login.sdk_http.omit_common") {
+            let items = omit.as_array().ok_or_else(invalid)?;
+            for item in items {
+                if !supplied.insert(item.as_str().ok_or_else(invalid)?) {
+                    return Err(invalid());
+                }
+            }
+        }
+        let expected = moenotes_client::sdk_http::COMMON_FIELDS;
+        if supplied.iter().any(|key| !expected.contains(key)) {
+            return Err(invalid());
+        }
+        if expected.iter().any(|key| !supplied.contains(key)) {
+            missing.push("login.sdk_http.common");
         }
     }
     let parent = path.parent().unwrap_or(Path::new("."));
@@ -150,13 +228,8 @@ pub fn inspect(path: &Path, fallback: SocketAddr) -> Result<Startup, ClientError
                 let key = read_api_key(&path)?;
                 if key.is_empty() {
                     missing.push("api_key_file.content");
-                } else if key.len() < 32
-                    || !key.is_ascii()
-                    || key
-                        .bytes()
-                        .any(|c| c.is_ascii_whitespace() || c.is_ascii_control())
-                {
-                    return Err(invalid());
+                } else {
+                    validate_api_key(&key)?;
                 }
             }
         } else if matches!(key, "credentials_file" | "login.sdk_http_file")

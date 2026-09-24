@@ -1,40 +1,77 @@
-# Copy to config.toml and supply your own authorized session configuration.
-listen = "127.0.0.1:8080"
-response_mode = "public" # public (filtered), raw (trusted operators), or disabled
-access_log = true # No URLs, query values, request bodies or credentials.
-api_key_file = "secrets/http-api-key"
-# credentials_file = "secrets/game-session.json"
+# Single-file configuration (unreleased; requires a source build).
+# Blank settings keep `serve` health-only. Fill with authorized values.
+# Protect populated config with mode 0600 and container UID 65532 ownership.
+# Account passwords stay ONLY in /accounts/*.json, never in this file.
+listen = "0.0.0.0:8080"
+api_key = "" # Random ASCII HTTP bearer key, at least 32 chars, no whitespace.
+response_mode = "public" # raw is for trusted operators only.
+access_log = true
 timeout_seconds = 10
 minimum_interval_ms = 1000
 queue_capacity = 32
 cache_ttl_seconds = 15
 cache_capacity = 1024
 
-# Managed login replaces credentials_file; these paths must be private.
-# [login]
-# context_file = "secrets/device-context.json"
-# sdk_http_file = "secrets/sdk-http.json"
-# state_dir = "secrets/state" # Existing writable directory, mode 0700.
+[session]
+region = ""
+origin = ""
+allowed_origins = [] # Include the exact HTTPS origin above.
+platform = "android"
+client_version = ""
+# master_version = "" # Configure both versions together only when required.
+# resource_version = ""
 
-# Optional lazy email/password source; requires all three [login] paths above.
-# [accounts]
-# directory = "/accounts" # Optional; this is the default.
-# selected = "worker.json" # Required if more than one JSON file is present.
-# allow_create = true # Only when pre-login reports no role in session.region.
-# sdk_ready = true # Assert required official SDK consent/checks are complete.
-# Files: {"user":"EMAIL","password":"PASSWORD"}, mode 0600; directory mode 0700.
-# Health/status never load accounts. See docs/accounts.md before enabling.
+[accounts]
+directory = "/accounts"
+# selected = "worker.json" # Required when multiple account JSON files exist.
+allow_create = true # Only when pre-login reports no role in this region.
+sdk_ready = false # Set true after required official SDK consent/checks.
 
 [recovery]
 enabled = false # Opt in: recovery may invalidate another device's session.
 cooldown_seconds = 300
 
-[session]
-region = "configure-your-region"
-origin = "https://game.example.invalid"
-allowed_origins = ["https://game.example.invalid"]
-platform = "android"
-client_version = "1.0.1"
-# Supply both together when required by the validated session.
-# master_version = "validated-master-version"
-# resource_version = "validated-resource-version"
+[login]
+state_dir = "/var/lib/moenotes" # Existing persistent writable directory, mode 0700.
+
+[login.context]
+device_model = ""
+operating_system = ""
+device_identifier = ""
+# Replace these numeric placeholders with observed channel parameters.
+global_channel_id = 0
+brand_id = 0
+area_id = 0
+
+[login.sdk_http]
+base_url = ""
+allowed_base_urls = [] # Include the exact HTTPS SDK base URL above.
+app_key = ""
+country_id = 0 # Replace with the actual SDK country ID.
+# one_sdk_version = "" # Omit this key when the SDK header is not supplied.
+omit_common = ["adid"] # Explicit null/omission; not equivalent to an empty string.
+
+[login.sdk_http.common]
+game_id = ""
+server_id = ""
+merchant_id = ""
+app_ver = ""
+sdk_ver = ""
+channel_id = ""
+platform = ""
+platform_type = ""
+net = ""
+operators = ""
+model = ""
+pf_ver = ""
+udid = ""
+dp = ""
+lang = ""
+sdk_log_type = ""
+ad_ext = ""
+time_zone = ""
+isRoot = ""
+
+# Legacy alternatives remain supported, never combined with the matching inline source:
+# top-level api_key_file; login.context_file; login.sdk_http_file.
+# See docs/configuration.md for migration and SDK omission semantics.

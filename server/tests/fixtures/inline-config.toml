@@ -1,0 +1,52 @@
+listen = "127.0.0.1:0"
+api_key = "synthetic-bootstrap-api-key-1234567890"
+access_log = false
+
+[session]
+region = "test"
+origin = "https://game.invalid"
+allowed_origins = ["https://game.invalid"]
+platform = "android"
+client_version = "1"
+
+[accounts]
+directory = "accounts"
+
+[login]
+state_dir = "."
+
+[login.context]
+device_model = "synthetic"
+operating_system = "synthetic"
+device_identifier = "synthetic-never-log"
+global_channel_id = 1
+brand_id = 1
+area_id = 1
+
+[login.sdk_http]
+base_url = "https://sdk.invalid"
+allowed_base_urls = ["https://sdk.invalid"]
+app_key = "synthetic-never-log"
+country_id = 1
+omit_common = ["adid"]
+
+[login.sdk_http.common]
+game_id = "synthetic"
+server_id = "synthetic"
+merchant_id = "synthetic"
+app_ver = "synthetic"
+sdk_ver = "synthetic"
+channel_id = "synthetic"
+platform = "synthetic"
+platform_type = "synthetic"
+net = "synthetic"
+operators = "synthetic"
+model = "synthetic"
+pf_ver = "synthetic"
+udid = "synthetic-never-log"
+dp = "synthetic"
+lang = "synthetic"
+sdk_log_type = "synthetic"
+ad_ext = ""
+time_zone = "synthetic"
+isRoot = "synthetic"

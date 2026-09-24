@@ -21,13 +21,16 @@ use zeroize::Zeroizing;
 #[derive(Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct LoginConfig {
+    #[serde(default)]
     pub context_file: PathBuf,
+    pub context: Option<Context>,
     pub sdk_http_file: Option<PathBuf>,
+    pub sdk_http: Option<SdkConfig>,
     pub state_dir: PathBuf,
 }
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct Context {
+pub struct Context {
     device_model: String,
     operating_system: String,
     device_identifier: String,
@@ -35,13 +38,17 @@ struct Context {
     brand_id: u32,
     area_id: u32,
 }
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct SdkConfig {
+pub struct SdkConfig {
     base_url: String,
     allowed_base_urls: Vec<String>,
-    app_key: String,
+    app_key: crate::secret::SecretString,
+    #[serde(default)]
     common: BTreeMap<String, Option<String>>,
+    /// TOML has no null; explicitly list common parameters to omit on the wire.
+    #[serde(default)]
+    omit_common: Vec<String>,
     country_id: u32,
     #[serde(default)]
     one_sdk_version: Option<String>,
@@ -127,6 +134,33 @@ fn publish(path: &Path, bytes: &[u8]) -> Result<(), ClientError> {
     Ok(())
 }
 impl LoginConfig {
+    pub fn validate_sources(&self) -> Result<(), ClientError> {
+        if self.context.is_some() == !self.context_file.as_os_str().is_empty()
+            || self.sdk_http.is_some() && self.sdk_http_file.is_some()
+            || self
+                .sdk_http_file
+                .as_ref()
+                .is_some_and(|p| p.as_os_str().is_empty())
+            || self.state_dir.as_os_str().is_empty()
+        {
+            return Err(invalid());
+        }
+        Ok(())
+    }
+    pub fn has_sdk_http(&self) -> bool {
+        self.sdk_http.is_some() || self.sdk_http_file.is_some()
+    }
+    fn sdk_client(&self) -> Result<(SdkHttpClient, u32), ClientError> {
+        match (&self.sdk_http, &self.sdk_http_file) {
+            (Some(config), None) => config.client(),
+            (None, Some(path)) => {
+                let bytes = private_read(path)?;
+                let config: SdkConfig = serde_json::from_slice(&bytes).map_err(|_| invalid())?;
+                config.client()
+            }
+            _ => Err(invalid()),
+        }
+    }
     pub fn lock(&self) -> Result<fs::File, ClientError> {
         private_dir(&self.state_dir)?;
         let path = self.state_dir.join("operator.lock");
@@ -148,17 +182,23 @@ impl LoginConfig {
         Ok(file)
     }
     pub fn validate(&self, config: &SessionConfig) -> Result<(), ClientError> {
+        self.validate_sources()?;
         private_dir(&self.state_dir)?;
         self.context()?;
         config.validate()?;
-        if let Some(path) = &self.sdk_http_file {
-            let _ = sdk_client(path)?;
+        if self.has_sdk_http() {
+            let _ = self.sdk_client()?;
         }
         Ok(())
     }
     pub fn context(&self) -> Result<AndroidLoginContext, ClientError> {
-        let bytes = private_read(&self.context_file)?;
-        let c: Context = serde_json::from_slice(&bytes).map_err(|_| invalid())?;
+        self.validate_sources()?;
+        let c: Context = if let Some(context) = &self.context {
+            context.clone()
+        } else {
+            let bytes = private_read(&self.context_file)?;
+            serde_json::from_slice(&bytes).map_err(|_| invalid())?
+        };
         if [&c.device_model, &c.operating_system, &c.device_identifier]
             .iter()
             .any(|v| v.is_empty() || v.len() > 1024)
@@ -234,27 +274,33 @@ impl LoginConfig {
     }
 }
 
-fn sdk_client(path: &Path) -> Result<(SdkHttpClient, u32), ClientError> {
-    let bytes = private_read(path)?;
-    let cfg: SdkConfig = serde_json::from_slice(&bytes).map_err(|_| invalid())?;
-    let client = SdkHttpClient::new(
-        SdkHttpConfig {
-            base_url: cfg.base_url,
-            allowed_base_urls: cfg.allowed_base_urls,
-        },
-        CommonParameters::new(cfg.common).map_err(|_| invalid())?,
-        AppKey::new(cfg.app_key).map_err(|_| invalid())?,
-        SdkHeaders {
-            trace_id: None,
-            one_sdk_version: cfg.one_sdk_version,
-        },
-        SdkHttpOptions {
-            timeout: Duration::from_secs(30),
-            ..Default::default()
-        },
-    )
-    .map_err(|_| invalid())?;
-    Ok((client, cfg.country_id))
+impl SdkConfig {
+    fn client(&self) -> Result<(SdkHttpClient, u32), ClientError> {
+        let mut common = self.common.clone();
+        for key in &self.omit_common {
+            if common.insert(key.clone(), None).is_some() {
+                return Err(invalid());
+            }
+        }
+        let client = SdkHttpClient::new(
+            SdkHttpConfig {
+                base_url: self.base_url.clone(),
+                allowed_base_urls: self.allowed_base_urls.clone(),
+            },
+            CommonParameters::new(common).map_err(|_| invalid())?,
+            AppKey::new(self.app_key.0.clone()).map_err(|_| invalid())?,
+            SdkHeaders {
+                trace_id: None,
+                one_sdk_version: self.one_sdk_version.clone(),
+            },
+            SdkHttpOptions {
+                timeout: Duration::from_secs(30),
+                ..Default::default()
+            },
+        )
+        .map_err(|_| invalid())?;
+        Ok((client, self.country_id))
+    }
 }
 
 pub async fn sdk_login(
@@ -294,13 +340,9 @@ pub(crate) async fn password_authorization(
     password: Zeroizing<String>,
     cancel: CancellationToken,
 ) -> Result<SdkAuthorization, String> {
-    let (client, country_id) = sdk_client(
-        login
-            .sdk_http_file
-            .as_deref()
-            .ok_or("sdk_http_file required")?,
-    )
-    .map_err(|_| "invalid SDK HTTP configuration")?;
+    let (client, country_id) = login
+        .sdk_client()
+        .map_err(|_| "invalid SDK HTTP configuration")?;
     let rsa = match client.fetch_rsa(None, cancel.clone()).await {
         Ok(SdkReply::Success(value)) => value,
         Ok(SdkReply::Rejected(value)) => return Err(format!("SDK RSA rejected: {}", value.code())),
@@ -422,7 +464,9 @@ mod tests {
         fs::set_permissions(&context, fs::Permissions::from_mode(0o600)).unwrap();
         let login = LoginConfig {
             context_file: context,
+            context: None,
             sdk_http_file: None,
+            sdk_http: None,
             state_dir: dir.path().into(),
         };
         let config = SessionConfig {
@@ -435,6 +479,33 @@ mod tests {
             resource_version: None,
         };
         (dir, login, config)
+    }
+    #[tokio::test]
+    async fn inline_sdk_omissions_match_legacy_json_nulls() {
+        let value: toml::Value =
+            toml::from_str(include_str!("../tests/fixtures/inline-config.toml")).unwrap();
+        let inline: SdkConfig = value["login"]["sdk_http"].clone().try_into().unwrap();
+        let mut legacy_common = inline.common.clone();
+        legacy_common.insert("adid".into(), None);
+        let legacy: SdkConfig = serde_json::from_value(serde_json::json!({
+            "base_url":inline.base_url,"allowed_base_urls":inline.allowed_base_urls,
+            "app_key":inline.app_key.0,"country_id":inline.country_id,"common":legacy_common,
+        }))
+        .unwrap();
+        inline.client().unwrap();
+        legacy.client().unwrap();
+        let mut combined = inline.common.clone();
+        for name in &inline.omit_common {
+            combined.insert(name.clone(), None);
+        }
+        assert_eq!(combined, legacy.common);
+        assert_eq!(combined["ad_ext"], Some(String::new()));
+        assert_eq!(combined["adid"], None);
+        for omit in [vec!["adid", "adid"], vec!["game_id"], vec!["unknown"]] {
+            let mut invalid = inline.clone();
+            invalid.omit_common = omit.into_iter().map(String::from).collect();
+            assert!(invalid.client().is_err());
+        }
     }
     #[tokio::test]
     async fn snapshots_roundtrip_and_pointer_cannot_escape() {

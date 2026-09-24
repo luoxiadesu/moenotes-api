@@ -6,6 +6,10 @@ claimed. Use only accounts and upstream services you are authorized to access.
 
 ## Deployment
 
+- Inline configuration (unreleased) makes `config.toml` a secret file: use owner-only
+  Unix permissions and a read-only mount. HTTP keys and SDK AppKeys must not enter
+  images, logs or Git. Account passwords remain exclusively in `/accounts`.
+
 - Use default public projection for shared callers; raw mode is trusted-operator-only.
   All HTTP key holders share the configured game account. Public player data remains
   personal data even after caller-specific fields are removed.

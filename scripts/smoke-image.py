@@ -2,6 +2,7 @@
 """Test a built container with synthetic config; no game endpoint is called."""
 import io
 import json
+from pathlib import Path
 import subprocess
 import sys
 import tarfile
@@ -27,11 +28,22 @@ def wait_healthy(opener, port):
             time.sleep(0.2)
 
 
-def unconfigured(image):
+def unconfigured(image, template=False):
     name = "moenotes-empty-smoke-" + uuid.uuid4().hex
     run("docker", "create", "--name", name, "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
         "-p", "127.0.0.1::8080", image)
     try:
+        if template:
+            archive = io.BytesIO()
+            with tarfile.open(fileobj=archive, mode="w") as tar:
+                directory = tarfile.TarInfo("etc/moenotes")
+                directory.type, directory.mode = tarfile.DIRTYPE, 0o755
+                tar.addfile(directory)
+                data = (Path(__file__).resolve().parents[1] / "config.example.toml").read_bytes()
+                entry = tarfile.TarInfo("etc/moenotes/config.toml")
+                entry.size, entry.mode = len(data), 0o644
+                tar.addfile(entry, io.BytesIO(data))
+            subprocess.run(["docker", "cp", "-a", "-", f"{name}:/"], input=archive.getvalue(), check=True)
         run("docker", "start", name)
         port = run("docker", "port", name, "8080/tcp", text=True).strip()
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
@@ -48,10 +60,14 @@ def unconfigured(image):
         logs = run("docker", "logs", name, stderr=subprocess.STDOUT, text=True)
         warnings = [json.loads(line) for line in logs.splitlines() if line.startswith("{")]
         warning = next(row for row in warnings if row.get("event") == "configuration_missing")
-        assert set(warning["missing"]) == {
-            "config_file", "api_key_file", "session.region", "session.origin",
-            "session.allowed_origins", "session.platform", "session.client_version",
-        }
+        if template:
+            assert {"api_key", "session.origin", "login.context.device_identifier",
+                    "login.sdk_http.app_key"} <= set(warning["missing"])
+        else:
+            assert set(warning["missing"]) == {
+                "config_file", "api_key_file", "session.region", "session.origin",
+                "session.allowed_origins", "session.platform", "session.client_version",
+            }
         assert warning["mode"] == "health_only"
         check = subprocess.run(["docker", "exec", name, "moenotes-server", "check-config",
                                 "/etc/moenotes/config.toml"], capture_output=True)
@@ -66,11 +82,13 @@ def main(image, version):
     assert run("docker", "run", "--rm", "--network", "none", image, "--version", text=True).strip() == f"moenotes-server {version}"
     assert run("docker", "image", "inspect", "--format", "{{.Config.User}}", image, text=True).strip() == "65532:65532"
     unconfigured(image)
+    unconfigured(image, template=True)
     configured(image, accounts=False)
     configured(image, accounts=True)
+    configured(image, accounts=True, inline=True)
 
 
-def configured(image, accounts):
+def configured(image, accounts, inline=False):
     config = b'''listen = "0.0.0.0:8080"
 response_mode = "disabled"
 api_key_file = "key"
@@ -106,6 +124,12 @@ state_dir = "state"
             "allowed_base_urls": ["https://sdk.example.invalid"],
             "app_key": "synthetic-key", "country_id": 1, "common": common,
         }).encode()
+    if inline:
+        data = (Path(__file__).resolve().parents[1] / "server/tests/fixtures/inline-config.toml").read_text()
+        data = data.replace('127.0.0.1:0', '0.0.0.0:8080')
+        data = data.replace('synthetic-bootstrap-api-key-1234567890', 'synthetic-smoke-key-not-for-production-123456')
+        data = data.replace('directory = "accounts"', 'directory = "/accounts"').replace('state_dir = "."', 'state_dir = "state"')
+        files = {"config.toml": data.encode()}
     archive = io.BytesIO()
     with tarfile.open(fileobj=archive, mode="w") as tar:
         for path in (["etc/moenotes", "etc/moenotes/state", "accounts"] if accounts else ["etc/moenotes"]):
@@ -150,6 +174,7 @@ state_dir = "state"
             logs = run("docker", "logs", name, stderr=subprocess.STDOUT, text=True)
             assert "account_source" in logs
             assert "account_sdk_login" not in logs
+            assert "synthetic-never-log" not in logs
         for path in ("LICENSE", "PROTOCOL-NOTICE.md"):
             run("docker", "exec", name, "test", "-s", f"/usr/share/doc/moenotes-api/{path}")
         run("docker", "stop", "--time", "5", name)

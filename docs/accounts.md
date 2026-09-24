@@ -7,6 +7,11 @@ create a missing regional role. No new HTTP login endpoint is exposed.
 
 ## Configuration
 
+Unreleased source can place device/SDK settings and the HTTP key directly in
+`config.toml`; see [single-file configuration](configuration.md). Account passwords
+still stay exclusively in `/accounts`. The following file-source form remains
+supported, including in the published alpha.3 image.
+
 Add these sections to a complete server configuration. The device context, SDK
 HTTP configuration and state directory are described in [operations](operations.md).
 The project does not distribute service AppKeys or device identifiers.

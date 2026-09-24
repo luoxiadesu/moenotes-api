@@ -3,7 +3,7 @@ use moenotes_server::{
     RouterOptions,
     accounts::AccountDirectoryClient,
     cache::CacheOptions,
-    config::{Config, read_api_key},
+    config::Config,
     managed::{GameRecovery, ManagedClient, Recovery},
     operator, router_with_options,
 };
@@ -196,7 +196,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     let managed = Arc::new(managed);
     let app = router_with_options(
         managed.clone(),
-        read_api_key(&config.api_key_file)?,
+        config.read_api_key()?,
         RouterOptions {
             mode: config.mode(),
             managed: Some(managed.clone()),

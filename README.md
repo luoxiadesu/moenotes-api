@@ -111,7 +111,14 @@ they do not bypass SDK checks or implement complete authorization or renewal.
 
 ## Run the HTTP Server
 
-Start from `config.example.toml`. Set `api_key_file` to a private file containing
+Unreleased source supports one `config.toml` for the HTTP key, game session,
+device context and SDK HTTP settings. Account passwords remain in `/accounts`.
+The blank [template](config.example.toml) starts health-only until filled in;
+see [single-file configuration](docs/configuration.md). The published alpha.3
+image still uses the file-based configuration below.
+
+For the alpha.3 image, use the file-based example in [operations](docs/operations.md).
+Set `api_key_file` to a private file containing
 a random ASCII key of at least 32 characters. On Unix, both secret files must have
 no group/other permissions (for example, mode `0600`). Never put keys on a command
 line or commit them. Relative file paths resolve against the configuration file.
@@ -181,6 +188,7 @@ smoke-tests each native Linux image before publishing. See [releasing](docs/rele
 
 ## Documentation
 
+- [Single-file configuration and legacy compatibility](docs/configuration.md)
 - [Client, authentication and error model](docs/client.md)
 - [Operator login, recovery and diagnostics](docs/operations.md)
 - [Lazy account directory](docs/accounts.md)

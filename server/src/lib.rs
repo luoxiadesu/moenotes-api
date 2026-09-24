@@ -8,6 +8,7 @@ mod openapi;
 pub mod operator;
 pub mod projection;
 mod query_params;
+pub mod secret;
 pub mod startup;
 
 use axum::{

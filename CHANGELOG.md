@@ -2,6 +2,17 @@
 
 Version numbers follow MAJOR.MINOR.PATCH. Pre-release APIs are experimental.
 
+## Unreleased
+
+- Support inline `api_key`, `[login.context]` and `[login.sdk_http]` in one private
+  config file; preserve legacy file sources and reject conflicting sources.
+- Keep passwords in `/accounts` and persisted session state separate. Require
+  private permissions for populated inline secrets, with redacted secret wrappers.
+- Add explicit SDK `omit_common` for TOML null semantics without changing wire
+  encoding. Extend health-only startup to missing inline fields and blank templates.
+- Add fields to experimental Rust `Config`/`LoginConfig`; direct struct literals
+  must provide the new optional fields. HTTP v1 and snapshot formats are unchanged.
+
 ## 0.1.0-alpha.3 - 2026-09-25
 
 - Add an opt-in lazy `/accounts` email/password JSON source. Health/status and

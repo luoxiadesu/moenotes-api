@@ -41,6 +41,15 @@ fn request_with_auth(address: &str, path: &str, auth: bool) -> String {
 #[cfg(unix)]
 #[test]
 fn account_deployment_starts_empty_and_reloads_without_logging_in() {
+    account_deployment(false);
+}
+#[cfg(unix)]
+#[test]
+fn inline_deployment_needs_no_other_configuration_files() {
+    account_deployment(true);
+}
+#[cfg(unix)]
+fn account_deployment(inline: bool) {
     use std::os::unix::fs::PermissionsExt;
     let dir = tempfile::tempdir().unwrap();
     fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o700)).unwrap();
@@ -79,6 +88,13 @@ client_version="1"
 "#,
     )
     .unwrap();
+    if inline {
+        fs::write(&path, include_str!("fixtures/inline-config.toml")).unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+        for name in ["key", "context.json", "sdk.json"] {
+            fs::remove_file(dir.path().join(name)).unwrap();
+        }
+    }
     let binary = env!("CARGO_BIN_EXE_moenotes-server");
     for command in ["check-config", "auth-status"] {
         let output = Command::new(binary)
@@ -175,6 +191,8 @@ client_version="1"
 fn empty_deployment_stays_alive_but_check_config_is_strict() {
     for content in [
         None,
+        Some(""),
+        Some("listen=\"127.0.0.1:0\"\napi_key=\"\"\n[login.context]\n[login.sdk_http]\n"),
         Some("listen=\"127.0.0.1:0\"\n[session]\nregion=\"synthetic-do-not-log\"\n"),
     ] {
         let dir = tempfile::tempdir().unwrap();
@@ -247,8 +265,38 @@ fn empty_deployment_stays_alive_but_check_config_is_strict() {
         let log: serde_json::Value = serde_json::from_str(error.lines().next().unwrap()).unwrap();
         assert_eq!(log["event"], "configuration_missing");
         let fields = log["missing"].as_array().unwrap();
-        assert!(fields.contains(&serde_json::json!("api_key_file")));
+        assert!(
+            fields.contains(&serde_json::json!("api_key_file"))
+                || fields.contains(&serde_json::json!("api_key"))
+        );
         assert!(fields.contains(&serde_json::json!("session.origin")));
         assert!(!error.contains("synthetic-do-not-log"));
+    }
+}
+
+#[test]
+fn distributed_blank_template_is_health_only() {
+    let template = fs::read_to_string(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .join("config.example.toml"),
+    )
+    .unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("config.toml");
+    fs::write(&path, template).unwrap();
+    let moenotes_server::startup::Startup::Unconfigured { missing, .. } =
+        moenotes_server::startup::inspect(&path, "127.0.0.1:0".parse().unwrap()).unwrap()
+    else {
+        panic!("blank template must bootstrap")
+    };
+    for key in [
+        "api_key",
+        "session.origin",
+        "login.context.device_identifier",
+        "login.sdk_http.app_key",
+    ] {
+        assert!(missing.contains(&key));
     }
 }

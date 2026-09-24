@@ -792,7 +792,9 @@ mod tests {
         );
         let login = LoginConfig {
             context_file: path,
+            context: None,
             sdk_http_file: None,
+            sdk_http: None,
             state_dir: dir.path().into(),
         };
         let sdk = SdkAuthorization::from_callback_json(

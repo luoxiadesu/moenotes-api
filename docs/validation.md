@@ -1,5 +1,22 @@
 # Validation Record
 
+## Unreleased Single-File Configuration
+
+2026-09-25: 98 Rust tests (36 client, 3 protocol, 52 server unit, 7 process
+integration), two doctests, seven release-script tests, fmt, all-target Clippy,
+documentation and Docker exported-input validation passed. The local amd64
+`moenotes-api:inline-config-dev` image passed five smoke configurations: absent
+config, blank distributed template, legacy static settings, legacy account-directory
+settings and inline settings with no auxiliary config files.
+
+Coverage includes private permissions/symlink rejection for populated inline
+values, redacted key formatting, 64 KiB bounds, conflicting sources, missing inline
+fields, SDK omissions vs. empty strings, TOML-to-legacy JSON equivalence and
+startup/health/status/reload without login. Existing mock role-login tests also
+exercise inline device context. No production SDK/game requests were made.
+Account passwords remain exclusively in `/accounts`; snapshots and the HTTP v1
+contract are unchanged. This increment is not in the published alpha.3 image.
+
 ## Alpha.3 Account Directory and Health Bootstrap
 
 2026-09-25: 91 Rust tests (36 client, 3 protocol, 47 server unit, 5 process
