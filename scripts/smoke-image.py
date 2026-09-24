@@ -55,7 +55,7 @@ client_version = "1.0.1"
                 if attempt == 49:
                     raise
                 time.sleep(0.2)
-        for path, expected in (("/openapi.json", 401), ("/experimental/v1/announcements/list", 404)):
+        for path, expected in (("/openapi.json", 401), ("/v1/announcements", 404)):
             try:
                 opener.open(f"http://{port}{path}", timeout=2)
                 raise AssertionError("unexpected success")

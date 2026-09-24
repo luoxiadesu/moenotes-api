@@ -3,9 +3,11 @@
 An experimental Rust client and HTTP query gateway for Our Notes, based on
 static analysis of the Android `com.bilibili.sirius` 1.0.1 protocol.
 
-**Offline framework, not a verified live integration.** A complete SDK login flow,
-renewal, live compatibility, server limits and public-response field policy are not yet
-implemented or verified. Version `0.1.0-alpha.1` has no stable API guarantee. This is
+**Experimental, with limited authorized live validation.** SDK password login,
+game login, session persistence and selected queries have passed live checks;
+see [validation scope](docs/live-validation.md). Complete SDK flows, renewal,
+server limits and public-response field policy remain incomplete.
+Version `0.1.0-alpha.1` has no stable API guarantee. This is
 an independent project, not an official or endorsed API.
 
 ## What It Supports
@@ -16,10 +18,12 @@ an independent project, not an official or endorsed API.
   lookup and `Whoami`; HTTPS gRPC, explicit credential injection, cancellation,
   session isolation, bounded serial scheduling and classified errors. Explicit
   Android SDK-callback import, pre-login and game-login exchange are library-only.
-  Separate SDK HTTP RSA, password and cached-key primitives are offline-tested;
+  Separate SDK HTTP RSA, password and cached-key primitives are available;
   their results remain pending until required SDK post-login checks are completed.
+  Explicit private Unix SDK/session snapshots support restart without re-login.
 - `moenotes-server`: API-key-protected HTTP queries, short-lived bounded memory
-  cache, duplicate-request coalescing and experimental OpenAPI documentation.
+  cache, duplicate-request coalescing and OpenAPI documentation. Read routes use
+  GET with short `/v1` resource paths and URL query parameters.
 
 Queries cover profiles, favorites, event PT rankings and decks, song rankings,
 arena rankings and card trends, circles, gacha probabilities and announcements.
@@ -119,20 +123,21 @@ The default bind address is `127.0.0.1:8080`. `/healthz` reports process livenes
 only. `/openapi.json` requires `Authorization: Bearer <HTTP_API_KEY>`.
 
 After explicitly setting `enable_experimental_raw = true`, query routes accept
-POST requests with protobuf JSON bodies. Example request:
+GET requests with query parameters and no body. Example request:
 
 ```http
-POST /experimental/v1/events/ranking
+GET /v1/event/ranking?eventId=123&ranks=1&ranks=10&ranks=100
 Authorization: Bearer <HTTP_API_KEY>
-Content-Type: application/json
-
-{"eventId":"123","ranks":[1,10,100]}
 ```
 
-POST is used for structured, read-only query parameters; it does not imply a game
-write operation. The body is the un-enriched protobuf JSON response, with 64-bit
+For a profile, use `/v1/profile?playerProfileId=12345678901`. Arrays use repeated
+parameter names; IDs are decimal text. The response is un-enriched protobuf JSON, with 64-bit
 integers represented as decimal strings. Fetch time and cache status are headers.
 See [HTTP API](docs/http-api.md) for all routes, limits and error meanings.
+
+This source-level change removes the old POST `/experimental/v1/...` routes.
+Published `0.1.0-alpha.1` images do not contain it; build the current source until
+the next release. The upstream game protocol remains gRPC, not HTTP GET.
 
 ## Docker
 

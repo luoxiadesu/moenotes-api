@@ -4,6 +4,20 @@ Version numbers follow MAJOR.MINOR.PATCH. Pre-release APIs are experimental.
 
 ## Unreleased
 
+- **Breaking HTTP change:** replace POST `/experimental/v1/...` queries with short
+  GET `/v1/...` resource routes and URL parameters; remove old routes without redirects.
+  Arrays use repeated keys and nested filters use dotted names. Preserve upstream
+  gRPC, bearer authentication, protobuf JSON responses and no-store/cache behavior.
+- Generate GET query parameters in OpenAPI and reject ambiguous parameters,
+  invalid encoding, oversized URLs and GET request bodies before upstream work.
+
+- Accept SDK RSA public keys with nonstandard Base64 line widths and no final
+  newline, while preserving strict SPKI decoding and key-size limits.
+- Decode integer SDK user IDs losslessly, including values above the JavaScript
+  safe-integer range; reject fractional and overflowing numeric IDs.
+- Add explicit private SDK authorization persistence and generation-checked game
+  session export, compatible with static credential loading; no automatic saves.
+
 ## 0.1.0-alpha.1 - 2026-09-23
 
 - Add descriptor-based protocol generation and protobuf JSON reflection.

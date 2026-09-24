@@ -11,7 +11,7 @@ use crate::{
 use moenotes_proto::{generated::app::playerlogin, pool};
 use prost::Message;
 use prost_reflect::DynamicMessage;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::{
     fmt,
     sync::{Arc, RwLock},
@@ -65,6 +65,67 @@ impl fmt::Debug for SdkAuthorization {
 }
 
 impl SdkAuthorization {
+    /// Explicit, origin-bound SDK cache import. Does not validate token lifetime.
+    pub fn from_file(config: &SessionConfig, path: &std::path::Path) -> Result<Self, ClientError> {
+        #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct Stored {
+            region: String,
+            origin: String,
+            callback: Callback,
+        }
+        let bytes = crate::secret_file::read(path)?;
+        let stored: Stored = serde_json::from_slice(&bytes).map_err(|_| invalid())?;
+        let sdk = Self {
+            region: stored.region,
+            origin: origin(&stored.origin)?,
+            callback: stored.callback,
+        };
+        sdk.check_binding(config)?;
+        let callback = sdk.callback_bytes()?;
+        Self::from_callback_json(config, &callback)
+    }
+
+    /// Save to a new private Unix file, never automatically and never overwrite.
+    pub fn save_to_file(&self, path: &std::path::Path) -> Result<(), ClientError> {
+        let callback = self.callback_bytes()?;
+        // Serialize through borrowed fields below; no password is part of this cache.
+        #[derive(Serialize)]
+        struct RawStored<'a> {
+            region: &'a str,
+            origin: &'a str,
+            callback: &'a serde_json::value::RawValue,
+        }
+        let raw: &serde_json::value::RawValue =
+            serde_json::from_slice(&callback).map_err(|_| invalid())?;
+        let bytes = Zeroizing::new(
+            serde_json::to_vec(&RawStored {
+                region: &self.region,
+                origin: &self.origin,
+                callback: raw,
+            })
+            .map_err(|_| invalid())?,
+        );
+        crate::secret_file::create(path, &bytes)
+    }
+
+    fn callback_bytes(&self) -> Result<Zeroizing<Vec<u8>>, ClientError> {
+        #[derive(Serialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Export<'a> {
+            uid: &'a str,
+            access_token: &'a str,
+            id_token: &'a Option<String>,
+        }
+        serde_json::to_vec(&Export {
+            uid: &self.callback.uid,
+            access_token: &self.callback.access_token,
+            id_token: &self.callback.id_token,
+        })
+        .map(Zeroizing::new)
+        .map_err(|_| invalid())
+    }
+
     /// Import an authorized OneSDK OnUserLoginSuccess JSON callback. No I/O.
     /// Unknown SDK fields are ignored. The caller owns and must protect `json`.
     /// Binding to config is a local disclosure boundary, not SDK token validation.

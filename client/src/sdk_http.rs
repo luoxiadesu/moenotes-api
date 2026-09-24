@@ -510,7 +510,7 @@ fn encrypt_password(
     challenge: &RsaChallenge,
     password: &str,
 ) -> Result<Zeroizing<String>, SdkError> {
-    let key = RsaPublicKey::from_public_key_pem(&challenge.pem).map_err(|_| protocol())?;
+    let key = parse_rsa_public_key(&challenge.pem)?;
     // Public-key encryption only. No RSA private-key operation in production.
     if !(1024..=4096).contains(&key.n().bits()) {
         return Err(protocol());
@@ -527,6 +527,18 @@ fn encrypt_password(
         )
         .map_err(|_| protocol())?;
     Ok(Zeroizing::new(STANDARD.encode(ciphertext)))
+}
+
+fn parse_rsa_public_key(pem: &str) -> Result<RsaPublicKey, SdkError> {
+    // The native SDK decodes SPKI Base64 independently of PEM line width.
+    let body = pem
+        .trim()
+        .strip_prefix("-----BEGIN PUBLIC KEY-----")
+        .and_then(|value| value.strip_suffix("-----END PUBLIC KEY-----"))
+        .ok_or_else(protocol)?;
+    let encoded: String = body.chars().filter(|c| !c.is_ascii_whitespace()).collect();
+    let der = STANDARD.decode(encoded).map_err(|_| protocol())?;
+    RsaPublicKey::from_public_key_der(&der).map_err(|_| protocol())
 }
 
 #[cfg(test)]

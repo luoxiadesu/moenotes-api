@@ -55,6 +55,74 @@ fn callback_import_is_bounded_and_redacted() {
     );
 }
 
+#[cfg(unix)]
+#[test]
+fn sdk_cache_is_private_bound_and_never_overwritten() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+    let path = dir.path().join("sdk.json");
+    sdk().save_to_file(&path).unwrap();
+    let restored = SdkAuthorization::from_file(&config(), &path).unwrap();
+    assert!(!format!("{restored:?}").contains("synthetic"));
+    assert!(restored.save_to_file(&path).is_err());
+    let mut other = config();
+    other.origin = "https://other.invalid".into();
+    other.allowed_origins = vec![other.origin.clone()];
+    assert!(SdkAuthorization::from_file(&other, &path).is_err());
+    other = config();
+    other.region = "other".into();
+    assert!(SdkAuthorization::from_file(&other, &path).is_err());
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).unwrap();
+    assert!(SdkAuthorization::from_file(&config(), &path).is_err());
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn game_session_export_roundtrips_and_checks_generation() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+    let client = Client::with_transport(config(), None, options(), reply(success())).unwrap();
+    let path = dir.path().join("game.json");
+    assert_eq!(
+        client
+            .save_session(client.generation(), &path)
+            .unwrap_err()
+            .kind,
+        ErrorKind::AuthenticationRequired
+    );
+    let old = client.generation();
+    let receipt = client
+        .login_with_sdk(old, &sdk(), &context(), CancellationToken::new())
+        .await
+        .unwrap();
+    assert_eq!(
+        client.save_session(old, &path).unwrap_err().kind,
+        ErrorKind::SessionChanged
+    );
+    client.save_session(receipt.generation, &path).unwrap();
+    let restored = StaticCredentials::from_file(&path)
+        .unwrap()
+        .credentials(&config())
+        .unwrap()
+        .unwrap();
+    assert_eq!(restored.player_id, "synthetic-new-player");
+    assert_eq!(restored.credential, "synthetic-new-secret");
+    assert_eq!(restored.bid.as_deref(), Some("synthetic-sdk-uid"));
+    assert_eq!(restored.device_id, None);
+    assert!(client.save_session(receipt.generation, &path).is_err());
+    *client.session.read().unwrap().blocked.write().unwrap() = Some(ErrorKind::Authentication);
+    assert_eq!(
+        client
+            .save_session(receipt.generation, &dir.path().join("blocked.json"))
+            .unwrap_err()
+            .kind,
+        ErrorKind::Authentication
+    );
+    assert!(!dir.path().join("blocked.json").exists());
+}
+
 #[tokio::test]
 async fn login_and_prelogin_over_local_grpc() {
     let calls: Calls = Arc::default();

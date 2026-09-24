@@ -2,7 +2,7 @@ use super::*;
 use async_trait::async_trait;
 use axum::{body::Body, http::Request};
 use http_body_util::BodyExt;
-use moenotes_client::{Generation, QueryResponse};
+use moenotes_client::{Generation, Query, QueryResponse};
 use prost_reflect::DynamicMessage;
 use std::{
     sync::{
@@ -96,14 +96,44 @@ async fn overflowing_cache_ttl_is_rejected_without_upstream_work() {
     assert_eq!(fake.calls.load(Ordering::SeqCst), 0);
 }
 fn request(path: &str, key: bool, body: serde_json::Value) -> Request<Body> {
-    let mut request = Request::builder()
-        .method("POST")
-        .uri(path)
-        .header("content-type", "application/json");
+    fn pairs(prefix: &str, value: &serde_json::Value, out: &mut Vec<(String, String)>) {
+        match value {
+            serde_json::Value::Object(values) => {
+                for (name, value) in values {
+                    pairs(
+                        &if prefix.is_empty() {
+                            name.clone()
+                        } else {
+                            format!("{prefix}.{name}")
+                        },
+                        value,
+                        out,
+                    );
+                }
+            }
+            serde_json::Value::Array(values) => {
+                for value in values {
+                    pairs(prefix, value, out);
+                }
+            }
+            serde_json::Value::String(value) => out.push((prefix.to_owned(), value.clone())),
+            other => out.push((prefix.to_owned(), other.to_string())),
+        }
+    }
+    let mut parameters = Vec::new();
+    pairs("", &body, &mut parameters);
+    let encoded = url::form_urlencoded::Serializer::new(String::new())
+        .extend_pairs(parameters)
+        .finish();
+    let mut request = Request::builder().method("GET").uri(if encoded.is_empty() {
+        path.to_owned()
+    } else {
+        format!("{path}?{encoded}")
+    });
     if key {
         request = request.header("authorization", format!("Bearer {KEY}"));
     }
-    request.body(Body::from(body.to_string())).unwrap()
+    request.body(Body::empty()).unwrap()
 }
 fn app(fake: Arc<Fake>, enabled: bool) -> Router {
     router(
@@ -161,7 +191,7 @@ async fn routes_default_off_auth_health_and_json() {
     let response = enabled
         .clone()
         .oneshot(request(
-            "/experimental/v1/profiles/favorite-status",
+            "/v1/profile/favorites",
             true,
             serde_json::json!({"playerId":"synthetic"}),
         ))
@@ -180,7 +210,7 @@ async fn routes_default_off_auth_health_and_json() {
     let response = enabled
         .clone()
         .oneshot(request(
-            "/experimental/v1/profiles/favorite-status",
+            "/v1/profile/favorites",
             true,
             serde_json::json!({"playerId":"synthetic"}),
         ))
@@ -252,6 +282,43 @@ async fn all_http_routes_and_openapi() {
     let json: serde_json::Value =
         serde_json::from_slice(&response.into_body().collect().await.unwrap().to_bytes()).unwrap();
     assert_eq!(json["paths"].as_object().unwrap().len(), 15);
+    for (path, name) in ROUTES {
+        let method = moenotes_client::METHODS
+            .iter()
+            .find(|m| m.name == *name)
+            .unwrap();
+        let operation = &json["paths"][path]["get"];
+        assert!(operation.is_object());
+        assert!(operation.get("requestBody").is_none());
+        assert!(json["paths"][path].get("post").is_none());
+        let declared: Vec<_> = operation["parameters"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|p| p["name"].as_str().unwrap())
+            .collect();
+        let expected = crate::query_params::fields(
+            moenotes_proto::pool()
+                .get_message_by_name(method.input)
+                .unwrap(),
+        );
+        assert_eq!(
+            declared,
+            expected
+                .iter()
+                .map(|(name, _)| name.as_str())
+                .collect::<Vec<_>>()
+        );
+    }
+    let ranks = json["paths"]["/v1/event/ranking"]["get"]["parameters"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|p| p["name"] == "ranks")
+        .unwrap();
+    assert_eq!(ranks["explode"], true);
+    assert_eq!(ranks["required"], true);
+    assert_eq!(ranks["schema"]["type"], "array");
     assert_eq!(
         json["components"]["schemas"]["app.announcement.GetRequest"]["properties"]["id"]["type"],
         "string"
@@ -421,8 +488,8 @@ async fn malformed_oversized_input_and_weak_key_rejected() {
     let app = app(fake.clone(), true);
     for body in ["{".to_owned(), "x".repeat(65537)] {
         let request = Request::builder()
-            .method("POST")
-            .uri(ROUTES[0].0)
+            .method("GET")
+            .uri(format!("{}?id=1", ROUTES[0].0))
             .header("authorization", format!("Bearer {KEY}"))
             .header("content-type", "application/json")
             .body(Body::from(body))
@@ -433,4 +500,92 @@ async fn malformed_oversized_input_and_weak_key_rejected() {
         );
     }
     assert_eq!(fake.calls.load(Ordering::SeqCst), 0);
+}
+
+#[tokio::test]
+async fn get_only_routes_reject_old_paths_bodies_and_ambiguous_query_strings() {
+    let fake = Fake::new(Duration::ZERO);
+    let app = app(fake.clone(), true);
+    for method in ["POST", "PUT", "DELETE", "HEAD"] {
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method(method)
+                    .uri("/v1/profile?playerProfileId=1")
+                    .header("authorization", format!("Bearer {KEY}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            response.status(),
+            StatusCode::METHOD_NOT_ALLOWED,
+            "{method}"
+        );
+    }
+    for method in ["POST", "GET"] {
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method(method)
+                    .uri("/experimental/v1/profiles/find")
+                    .header("authorization", format!("Bearer {KEY}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    }
+    for query in [
+        "playerProfileId=1&playerProfileId=2".into(),
+        "playerProfileId=%GG".into(),
+        "playerProfileId=1&unknown=x".into(),
+        format!("playerProfileId={}", "1".repeat(8192)),
+    ] {
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/v1/profile?{query}"))
+                    .header("authorization", format!("Bearer {KEY}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(response.headers()["cache-control"], "no-store");
+    }
+    assert_eq!(fake.calls.load(Ordering::SeqCst), 0);
+}
+
+#[tokio::test]
+async fn get_query_cache_uses_parsed_request_and_preserves_array_order() {
+    let fake = Fake::new(Duration::ZERO);
+    let app = app(fake.clone(), true);
+    for (raw, expected) in [
+        ("eventId=1&ranks=10&ranks=1", "MISS"),
+        ("ranks=10&eventId=1&ranks=1", "HIT"),
+        ("eventId=1&ranks=1&ranks=10", "MISS"),
+        ("eventId=1&ranks=10&ranks=1&ranks=10", "MISS"),
+    ] {
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/v1/event/ranking?{raw}"))
+                    .header("authorization", format!("Bearer {KEY}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.headers()["x-moenotes-cache"], expected);
+    }
+    assert_eq!(fake.calls.load(Ordering::SeqCst), 3);
 }

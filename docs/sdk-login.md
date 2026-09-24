@@ -1,6 +1,6 @@
 # SDK-to-Game Login
 
-The Rust library supports an **explicit, offline-tested exchange** from an already
+The Rust library supports an **explicit SDK-to-game exchange** from an already
 authorized Android OneSDK login callback to game credentials. It does not perform
 the complete SDK login flow or automatic renewal. Separate [SDK HTTP primitives](sdk-http.md)
 cover RSA, password and cached-key requests, but return pending results without
@@ -48,7 +48,9 @@ memory-only; the integration remains responsible for its input buffer and storag
 ## Recovered Mapping
 
 Evidence is the Android 1.0.1 native login builder at `0x59e448c`, the server probe
-at `0x5e7a65c`, and the APK's OneSDK/GS Java bridge. No live acceptance is claimed.
+at `0x5e7a65c`, and the APK's OneSDK/GS Java bridge. Limited authorized live
+acceptance is documented in [validation scope](live-validation.md); it does not
+prove every runtime device field or all SDK branches are equivalent.
 
 | Request field | Source |
 | --- | --- |
@@ -92,6 +94,23 @@ the native success path calls `SetupCertification(id, credential, null)` and the
 new generation and raw uint32 `isNewUser`, never a credential-bearing protobuf.
 `session_status` remains a conservative local observation, not a perpetual
 validity guarantee. No Whoami, player-data load or disk save is implicit.
+
+### Explicit Persistence
+
+`SdkAuthorization::save_to_file(path)` saves a region/origin-bound SDK authorization;
+`SdkAuthorization::from_file(config, path)` validates that binding on import. These
+methods do not complete pending SDK consent steps or verify token expiry.
+`Client::save_session(generation, path)` exports current game credentials in the
+format accepted by `StaticCredentials::from_file`. A stale generation, absent
+credentials or locally blocked session is rejected. Reload using the same explicit
+`SessionConfig`; the credential file does not contain master/resource versions.
+
+Writes require Unix and an existing private parent directory (mode 0700 or stricter),
+use a private temporary file and publish without overwriting an existing path.
+Files contain plaintext secrets protected by filesystem permissions, not encryption.
+Use a new filename for each snapshot; errors do not replace an earlier snapshot.
+Read APIs reject oversized and group/other-readable files. Secure Windows ACL-based
+persistence is not implemented. No password is saved, and no HTTP export route exists.
 
 Login shares the client's serial queue, admission limit, start interval, timeout
 and cancellation. Version/device blocks require explicit session replacement;

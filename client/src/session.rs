@@ -50,6 +50,40 @@ struct CredentialFile {
     credentials: Credentials,
 }
 
+pub(crate) fn save_credentials(
+    config: &SessionConfig,
+    credentials: &Credentials,
+    path: &Path,
+) -> Result<(), ClientError> {
+    #[derive(Serialize)]
+    struct ExportCredentials<'a> {
+        player_id: &'a str,
+        credential: &'a str,
+        device_id: &'a Option<String>,
+        bid: &'a Option<String>,
+    }
+    #[derive(Serialize)]
+    struct Export<'a> {
+        region: &'a str,
+        origin: &'a str,
+        credentials: ExportCredentials<'a>,
+    }
+    let bytes = Zeroizing::new(
+        serde_json::to_vec(&Export {
+            region: &config.region,
+            origin: &config.origin,
+            credentials: ExportCredentials {
+                player_id: &credentials.player_id,
+                credential: &credentials.credential,
+                device_id: &credentials.device_id,
+                bid: &credentials.bid,
+            },
+        })
+        .map_err(|_| bad_config())?,
+    );
+    crate::secret_file::create(path, &bytes)
+}
+
 impl StaticCredentials {
     pub fn new(region: String, origin: String, credentials: Credentials) -> Self {
         Self {

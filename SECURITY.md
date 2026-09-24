@@ -1,6 +1,6 @@
 # Security Boundaries
 
-This is an experimental, offline-tested integration, not a production authentication
+This is an experimental integration with limited live validation, not a production authentication
 service or an official API. No stable release or security audit certification is
 claimed. Use only accounts and upstream services you are authorized to access.
 
@@ -16,8 +16,14 @@ claimed. Use only accounts and upstream services you are authorized to access.
   in the ignored `secrets/` directory, with owner-only permissions on Unix.
 - Do not log protobuf messages, raw SDK failure data or sensitive accessors.
   Redacted wrappers and best-effort zeroization do not wipe every library buffer.
+- GET query strings contain identifiers and filters, not credentials. Redact them
+  in proxy/access logs and keep bearer keys out of URLs and browser bookmarks.
 - Login can affect upstream account/session state. Cancellation is not rollback.
   SDK HTTP success is pending; it does not complete consent or authorize game access.
+- Explicit SDK/session snapshots are plaintext secret files, not an encrypted vault.
+  Unix writes require a private parent directory and never replace existing files;
+  keep backups and their parent paths private as well. Windows ACL-based saving is
+  not implemented. There is no automatic password or credential persistence.
 
 ## Dependency Advisory Review
 

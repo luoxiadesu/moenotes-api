@@ -3,6 +3,7 @@ pub mod auth;
 mod error;
 mod query;
 pub mod sdk_http;
+mod secret_file;
 mod session;
 pub mod transport;
 
@@ -168,6 +169,28 @@ impl Client {
             _ if session.credentials.is_some() => SessionStatus::CredentialsUnverified,
             _ => SessionStatus::Anonymous,
         }
+    }
+
+    /// Explicit Unix-only, no-overwrite export for StaticCredentials::from_file.
+    /// The parent directory must be private. No network call or renewal is made.
+    pub fn save_session(
+        &self,
+        generation: Generation,
+        path: &std::path::Path,
+    ) -> Result<(), ClientError> {
+        let session = self.session.read().unwrap();
+        if session.generation != generation {
+            return Err(ClientError::new(ErrorKind::SessionChanged));
+        }
+        let blocked = session.blocked.read().unwrap();
+        if let Some(kind) = *blocked {
+            return Err(ClientError::new(kind));
+        }
+        let credentials = session
+            .credentials
+            .as_ref()
+            .ok_or_else(|| ClientError::new(ErrorKind::AuthenticationRequired))?;
+        session::save_credentials(&session.config, credentials, path)
     }
 
     fn session_for(&self, generation: Generation) -> Result<Arc<Session>, ClientError> {

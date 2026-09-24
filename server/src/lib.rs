@@ -2,17 +2,19 @@
 pub mod cache;
 pub mod config;
 mod openapi;
+mod query_params;
 
 use axum::{
     Json, Router,
-    extract::{DefaultBodyLimit, Request, State},
+    body::Bytes,
+    extract::{DefaultBodyLimit, RawQuery, Request, State},
     http::{HeaderMap, StatusCode},
     middleware::{self, Next},
     response::{IntoResponse, Response},
-    routing::{get, post},
+    routing::get,
 };
 use cache::{CacheOptions, QueryCache};
-use moenotes_client::{CancellationToken, ClientError, ErrorKind, Query, QueryClient};
+use moenotes_client::{CancellationToken, ClientError, ErrorKind, QueryClient};
 use sha2::{Digest, Sha256};
 use std::{
     sync::Arc,
@@ -22,30 +24,21 @@ use subtle::ConstantTimeEq;
 use zeroize::Zeroizing;
 
 pub const ROUTES: &[(&str, &str)] = &[
-    ("/experimental/v1/announcements/detail", "announcement"),
-    ("/experimental/v1/announcements/list", "announcements"),
-    ("/experimental/v1/arena/ranking", "arena-ranking"),
-    ("/experimental/v1/arena/deck-trend", "deck-trend"),
-    ("/experimental/v1/circles/detail", "circle"),
-    (
-        "/experimental/v1/circles/recommendations",
-        "circle-recommendations",
-    ),
-    ("/experimental/v1/circles/search", "circle-search"),
-    (
-        "/experimental/v1/events/challenge-ranking",
-        "challenge-ranking",
-    ),
-    ("/experimental/v1/events/deck", "event-deck"),
-    ("/experimental/v1/events/ranking", "event-ranking"),
-    ("/experimental/v1/profiles/find", "profile"),
-    ("/experimental/v1/gacha/probability", "probability"),
-    ("/experimental/v1/music/ranking", "music-ranking"),
-    (
-        "/experimental/v1/profiles/favorite-status",
-        "favorite-status",
-    ),
-    ("/experimental/v1/profiles/batch", "profiles"),
+    ("/v1/announcement", "announcement"),
+    ("/v1/announcements", "announcements"),
+    ("/v1/arena/ranking", "arena-ranking"),
+    ("/v1/arena/deck-trend", "deck-trend"),
+    ("/v1/circle", "circle"),
+    ("/v1/circles/recommended", "circle-recommendations"),
+    ("/v1/circles/search", "circle-search"),
+    ("/v1/event/challenge-ranking", "challenge-ranking"),
+    ("/v1/event/deck", "event-deck"),
+    ("/v1/event/ranking", "event-ranking"),
+    ("/v1/profile", "profile"),
+    ("/v1/gacha/rates", "probability"),
+    ("/v1/music/ranking", "music-ranking"),
+    ("/v1/profile/favorites", "favorite-status"),
+    ("/v1/profiles", "profiles"),
 ];
 
 #[derive(Clone)]
@@ -83,15 +76,19 @@ pub fn router(
         for &(path, name) in ROUTES {
             protected = protected.route(
                 path,
-                post(
+                get(
                     move |State(state): State<ApiState>,
+                          RawQuery(raw): RawQuery,
                           body: Result<
-                        Json<serde_json::Value>,
-                        axum::extract::rejection::JsonRejection,
+                        Bytes,
+                        axum::extract::rejection::BytesRejection,
                     >| async move {
-                        let Json(value) = body
+                        let body = body
                             .map_err(|_| HttpError(ClientError::new(ErrorKind::InvalidRequest)))?;
-                        let query = Query::from_json(name, value).map_err(HttpError)?;
+                        if !body.is_empty() {
+                            return Err(HttpError(ClientError::new(ErrorKind::InvalidRequest)));
+                        }
+                        let query = query_params::parse(name, raw.as_deref()).map_err(HttpError)?;
                         let (response, status) =
                             state.cache.query(query).await.map_err(HttpError)?;
                         let mut headers = HeaderMap::new();
@@ -106,12 +103,12 @@ pub fn router(
                         );
                         Ok::<_, HttpError>((headers, Json(response.json.clone())))
                     },
-                ),
+                ).head(|| async { (StatusCode::METHOD_NOT_ALLOWED, [("allow", "GET"), ("cache-control", "no-store")]) }),
             );
         }
     }
     protected = protected
-        .layer(DefaultBodyLimit::max(64 * 1024))
+        .layer(DefaultBodyLimit::max(0))
         .route_layer(middleware::from_fn_with_state(state.clone(), authenticate));
     Ok(Router::new()
         .route(

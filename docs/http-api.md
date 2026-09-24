@@ -1,4 +1,9 @@
-# Experimental HTTP API
+# HTTP API
+
+The current source uses short GET routes under `/v1`. This replaces the original
+`POST /experimental/v1/...` contract; old routes are not retained or redirected.
+Published `0.1.0-alpha.1` images still use the old contract until a new release.
+The `/v1` namespace does not change the project's pre-release stability policy.
 
 Rust cache options are limited to a one-hour TTL and 16,384 entries, matching CLI
 configuration limits. Invalid options fail before upstream work is scheduled.
@@ -29,35 +34,60 @@ consumers must not treat it as sanitized HTML. No CDN authorization values are a
 
 ## Queries
 
-All routes use POST with an `application/json` protobuf request body. This avoids
-ambiguous array query parameters; these are read queries, not gameplay writes.
-64-bit values should be decimal strings. Unknown fields are rejected. Arrays retain
-their order and duplicates; no sorting/deduplication or UI-specific mutation occurs.
+All query routes use **GET without a request body**, with URL query parameters.
+Names use the protobuf lowerCamelCase spelling. IDs are decimal text, parsed without
+floating-point conversion; do not interchange profile, account and player IDs.
+Repeated fields use repeated keys, not commas, brackets or JSON arrays:
+`ranks=1&ranks=10&ranks=100`. Order and duplicate values are retained.
+Unknown fields, duplicate scalar fields, malformed URL encoding and invalid UTF-8
+are rejected. Enum values accept their exact name or decimal integer value.
 
-| Route under `/experimental/v1/` | Body fields |
+Nested circle filters use dotted names such as `options.name`. An unfiltered
+circle search automatically includes an empty `options` message. Use normal URL
+encoding for text; a literal `+` must be encoded as `%2B`.
+
+| Route under `/v1` | Query parameters |
 |---|---|
-| `announcements/detail` | `id` |
-| `announcements/list` | `selectedTab` (ALL, OPENING_EVENTS, BUG; default ALL) |
-| `arena/ranking` | `arenaSeasonId`, optional `bandId`, `rankingStart`, `rankingEnd` |
-| `arena/deck-trend` | `musicId`, `arenaSeasonId` |
-| `circles/detail` | `circleId` (uint64) |
-| `circles/recommendations` | `{}` |
-| `circles/search` | `options` containing `name`, `memberRange`, `joinRule`, `playStyle` |
-| `events/challenge-ranking` | `challengeMusicId` |
-| `events/deck` | `playerId` (string), `eventId` |
-| `events/ranking` | `eventId`, `ranks` (int32 array) |
-| `profiles/find` | `playerProfileId` |
-| `gacha/probability` | `gachaId`, optional `selectedPickUp` (int64 array) |
-| `music/ranking` | `musicId` |
-| `profiles/favorite-status` | `playerId` (string) |
-| `profiles/batch` | `accountIds` (int64 array) |
+| `/profile` | `playerProfileId` |
+| `/profiles` | repeated `accountIds` |
+| `/profile/favorites` | `playerId` (string) |
+| `/announcements` | optional `selectedTab`: ALL, OPENING_EVENTS, BUG; default ALL |
+| `/announcement` | `id` |
+| `/gacha/rates` | `gachaId`, optional repeated `selectedPickUp` |
+| `/music/ranking` | `musicId` |
+| `/event/ranking` | `eventId`, repeated `ranks` (int32) |
+| `/event/challenge-ranking` | `challengeMusicId` |
+| `/event/deck` | `playerId` (string), `eventId` |
+| `/arena/ranking` | `arenaSeasonId`, optional `bandId`, `rankingStart`, `rankingEnd` |
+| `/arena/deck-trend` | `musicId`, `arenaSeasonId` |
+| `/circle` | `circleId` (uint64) |
+| `/circles/recommended` | None |
+| `/circles/search` | optional `options.name`, `options.memberRange`, `options.joinRule`, `options.playStyle` |
+
+Examples with synthetic IDs:
+
+```http
+GET /v1/profile?playerProfileId=12345678901
+Authorization: Bearer <HTTP_API_KEY>
+```
+
+```http
+GET /v1/event/ranking?eventId=123&ranks=1&ranks=10&ranks=100
+Authorization: Bearer <HTTP_API_KEY>
+```
+
+The deprecated probability parameter `productId` is accepted only as zero;
+new integrations should omit it. `GET /openapi.json` provides the complete query
+parameter schema using OpenAPI `style: form`, `explode: true`, suitable for
+Swagger/Postman imports. A GET body is rejected with 400. Other query methods,
+including HEAD, return 405 without performing a query; removed paths return 404.
 
 There is no HTTP route for arbitrary RPCs, session credentials, Whoami, raw server
 discovery or version management. Client-library support methods are independent.
 The OpenAPI schema is generated from the bundled descriptor; it describes protobuf
 fields, while the following local admission limits are additional policies.
 
-Request bodies are limited to 64 KiB; at most 64 authenticated HTTP handlers can
+Query strings are limited to 8,192 encoded bytes and 256 parameter pairs; at most 64 authenticated HTTP handlers can
 run concurrently. The cache admits at most 32 different inflight keys; duplicate
 requests share the same operation. Additional work receives HTTP 429. Query
 validation uses the [local client limits](client.md); none are asserted server limits.
@@ -94,9 +124,10 @@ message is exposed. HTTP 401 means the HTTP key failed, **not** game authenticat
 
 | HTTP status | Meaning |
 |---|---|
-| 400 | Invalid JSON/query, unsupported parameter or local validation failure |
+| 400 | Invalid query encoding/parameter, nonempty body or local validation failure |
 | 401 | Missing/invalid/duplicate bearer authorization |
 | 404 | Unknown or disabled route |
+| 405 | Unsupported method; read-query routes accept GET only |
 | 429 | Local HTTP/inflight/upstream admission limit reached |
 | 502 | Upstream transport, protocol or other business failure |
 | 503 | Missing/rejected game session, maintenance, version/device conflict, cancellation or session change |
@@ -109,6 +140,9 @@ success and does not initiate authentication, retries or background polling.
 
 Loopback is the default. For remote access, terminate TLS at a trusted reverse proxy,
 limit request rate and connection/body-read timeouts there, and restrict network
-access. No browser CORS permission is granted. Never enable request-body/header
-logging at a proxy without redaction. Live visibility, account isolation semantics,
+access. No browser CORS permission is granted. Query strings can contain account
+identifiers or search text and may enter browser history or proxy logs. Keep API
+keys in the Authorization header, never in URLs; redact query strings and headers
+in access logs. `Cache-Control: no-store` remains set on query responses despite
+the GET transport. Live visibility, account isolation semantics,
 query depth, refresh rate and server error behavior still need authorized validation.

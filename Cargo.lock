@@ -823,6 +823,7 @@ dependencies = [
  "http-body-util",
  "moenotes-client",
  "moenotes-proto",
+ "percent-encoding",
  "prost-reflect",
  "serde",
  "serde_json",
@@ -833,6 +834,7 @@ dependencies = [
  "tokio-util",
  "toml",
  "tower",
+ "url",
  "zeroize",
 ]
 

@@ -1,8 +1,9 @@
 # SDK HTTP Login Primitives
 
 `moenotes_client::sdk_http` implements three explicit GS SDK POST operations from
-the Android 1.0.1 sample. They are offline-tested library primitives, **not a
-complete or live-verified SDK login workflow**. No HTTP gateway routes or CLI
+the Android 1.0.1 sample. RSA and email/password calls have authorized live samples;
+these remain library primitives, **not a complete SDK login workflow**.
+See [validation scope](live-validation.md). No HTTP gateway routes or CLI
 login commands are added. Account owners must authorize their use.
 
 | Method | Path | Business fields |
@@ -100,7 +101,8 @@ the recovered **POST** contract, not a GET/multipart signer. Wire field order
 does not reproduce Java HashMap iteration order.
 
 Password encryption is UTF-8 `hash + password`, RSA/ECB/PKCS1Padding (PKCS#1 v1.5),
-then standard padded Base64. The public key is SPKI PEM. These legacy primitives
+then standard padded Base64. The public key is SPKI PEM; Base64 line width and
+the final newline are not significant, matching the native SDK decoder. These legacy primitives
 are reproduced for compatibility, not recommended for new protocols. Production
 code performs public-key encryption only, never private-key decryption.
 
@@ -144,7 +146,9 @@ public gateway. It remains raw JSON, not Gson's string-map coercion.
   8,192 per RSA PEM, 1,024 per hash. RSA keys must be 1,024-4,096 bits and
   `hash + password` must fit modulus bytes minus 11. These are defensive limits,
   not recovered official constraints.
-- Required uid/access key must be nonempty strings. Missing/duplicate/mistyped
+- Required access keys must be nonempty strings. SDK uid accepts a nonempty string
+  or a nonnegative integer converted losslessly to decimal; floats are rejected.
+  Missing/duplicate/mistyped
   required envelope fields fail instead of emulating all Gson defaults/coercions.
   Invalid UTF-8 percent escapes are rejected instead of Java replacement characters.
   Optional current-user null strings are not emulated. Unknown JSON fields are

@@ -29,11 +29,11 @@ percent-encoding = "2"
 rand = "0.8"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
 rsa = "0.9"
+tempfile = "3"
 
 [dev-dependencies]
 tokio-stream.workspace = true
 axum = { workspace = true, features = ["http2"] }
 http-body-util = "0.1"
 http-body = "1"
-tempfile = "3"
 futures-util = "0.3"

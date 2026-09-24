@@ -61,7 +61,7 @@ client_version = "1.0.1"
     assert!(response.contains("200 OK"));
     assert!(response.contains("\"status\":\"ok\""));
     assert!(request(address, "/openapi.json").contains("401 Unauthorized"));
-    assert!(request(address, "/experimental/v1/announcements/list").contains("404 Not Found"));
+    assert!(request(address, "/v1/announcements").contains("404 Not Found"));
     #[cfg(unix)]
     {
         Command::new("kill")

@@ -64,6 +64,7 @@ impl fmt::Debug for RsaChallenge {
 /// Deliberately has no automatic conversion to SdkAuthorization or game session.
 #[derive(Deserialize, Zeroize, ZeroizeOnDrop)]
 pub struct PendingSdkLogin {
+    #[serde(deserialize_with = "deserialize_uid")]
     uid: String,
     #[serde(default)]
     access_key: Option<String>,
@@ -73,6 +74,29 @@ pub struct PendingSdkLogin {
     expires: Option<i64>,
     #[serde(default)]
     refresh_token: Option<String>,
+}
+
+fn deserialize_uid<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<String, D::Error> {
+    struct Uid;
+    impl serde::de::Visitor<'_> for Uid {
+        type Value = String;
+        fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+            formatter.write_str("a string or nonnegative integer SDK uid")
+        }
+        fn visit_str<E: serde::de::Error>(self, value: &str) -> Result<String, E> {
+            Ok(value.to_owned())
+        }
+        fn visit_u64<E: serde::de::Error>(self, value: u64) -> Result<String, E> {
+            Ok(value.to_string())
+        }
+        fn visit_i64<E: serde::de::Error>(self, value: i64) -> Result<String, E> {
+            if value < 0 {
+                return Err(E::custom("negative SDK uid"));
+            }
+            Ok(value.to_string())
+        }
+    }
+    deserializer.deserialize_any(Uid)
 }
 impl PendingSdkLogin {
     /// Account-specific identifier, never a game player ID.
@@ -131,8 +155,8 @@ pub(super) fn rsa(bytes: &[u8], binding: Generation) -> Result<SdkReply<RsaChall
         if data.rsa_key.len() > 8192 || data.hash.len() > 1024 {
             return Err(protocol());
         }
-        use rsa::{pkcs8::DecodePublicKey, traits::PublicKeyParts};
-        let key = rsa::RsaPublicKey::from_public_key_pem(&data.rsa_key).map_err(|_| protocol())?;
+        use rsa::traits::PublicKeyParts;
+        let key = super::parse_rsa_public_key(&data.rsa_key)?;
         if !(1024..=4096).contains(&key.n().bits()) {
             return Err(protocol());
         }

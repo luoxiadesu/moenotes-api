@@ -60,6 +60,8 @@ Credential files are explicitly supplied, read-only and limited to 64 KiB. Unix
 group/other permissions are rejected. Credentials have redacted Debug output and
 zeroize their owned fields on drop; this is best-effort memory hygiene, not a claim
 that every HTTP/2/library allocation is wiped. No session is automatically saved.
+An operator can explicitly call `Client::save_session(generation, path)` to create
+a private Unix snapshot for later static loading; see [persistence](sdk-login.md#explicit-persistence).
 
 Every request has a new UUID request ID. There is no automatic retry or forced
 device override. Authenticated calls add player credentials and optional device/BID
@@ -117,7 +119,7 @@ transfers responsibility for TLS and network policy to the caller.
 
 ## Not Implemented
 
-Complete SDK authorization workflows, SDK refresh, live credential validation,
+Complete SDK authorization workflows, SDK refresh, automatic credential validation,
 automatic version/master synchronization, daily-reset UI, notifications and local
 game state, cross-origin failover, JP support, and gameplay writes. A successful
 offline test or `check-config` does not establish live service availability.

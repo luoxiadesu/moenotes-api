@@ -1,5 +1,24 @@
 # Validation Record
 
+## 2026-09-24 Update
+
+Current source includes GET `/v1` routing and SDK/session persistence. All 54
+tests (36 client, 3 protocol, 14 HTTP/cache/query, 1 CLI) and two doctests pass,
+along with formatting and all-target Clippy with warnings denied.
+Query tests cover repeated array ordering/duplicates, exact 64-bit IDs, optional
+presence, dotted filters, enums, invalid percent encoding/UTF-8, duplicate scalars,
+unknown fields, size limits, GET bodies, removed routes, method rejection and
+cache-key equivalence. OpenAPI declares all fifteen GET operations and parameters.
+
+An authorized smoke test with a saved game session returned HTTP 200 for profile
+and announcement GETs, MISS then HIT for the profile, 401 without a key, 400 for
+invalid query/body, 404 for the old route and 405 for POST/HEAD. Only two upstream
+query calls were needed; no login or game-state mutation was performed. The test
+server was stopped afterward. See [live scope](live-validation.md) for prior
+authentication and query coverage. No new image or release has been published.
+
+## Initial Validation
+
 Local validation on 2026-09-23, Linux x86_64 (WSL2), pinned Rust 1.98.1.
 This record covers the initial framework, SDK exchange, SDK HTTP increments and
 local preparation of `0.1.0-alpha.1`, not a stable release.

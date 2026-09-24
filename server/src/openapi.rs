@@ -16,23 +16,37 @@ pub fn document() -> Value {
                 &mut schemas,
             );
         }
-        paths.insert(path, json!({"post":{
-            "operationId":name,"tags":["experimental raw queries"],
-            "description":"Disabled unless enable_experimental_raw=true. Raw response may include operator-account-specific fields. No online compatibility guarantee.",
+        let parameters: Vec<_> = crate::query_params::fields(
+            moenotes_proto::pool().get_message_by_name(method.input).unwrap()
+        ).into_iter().map(|(field_name, field)| {
+            let mut value = kind(field.kind(), &mut schemas);
+            if field.is_list() {
+                value = json!({"type":"array","items":value,"maxItems":100});
+                if crate::query_params::required(name, &field_name) {
+                    value["minItems"] = json!(1);
+                }
+            }
+            json!({"name":field_name,"in":"query","required":crate::query_params::required(name, &field_name),
+                "style":"form","explode":true,"deprecated":field.options().get_field_by_name("deprecated").is_some_and(|v|v.as_bool()==Some(true)),
+                "schema":value,"description":if field.is_list() {"Repeat the parameter for each item; order and duplicates are preserved."} else {"Single occurrence only. Nested filters use dotted field names."}})
+        }).collect();
+        paths.insert(path, json!({"get":{
+            "operationId":name,"tags":["read queries"],
+            "description":"Disabled unless enable_experimental_raw=true. No request body. Raw response may include operator-account-specific fields. Query string limited to 8192 bytes and 256 parameters.",
             "security":[{"apiKey":[]}],
-            "requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":format!("#/components/schemas/{}",method.input)}}}},
+            "parameters":parameters,
             "responses":{
                 "200":{"description":"Raw protobuf JSON; 64-bit integers are strings. Fetch time is Unix milliseconds.",
                     "headers":{"X-Moenotes-Cache":{"schema":{"type":"string","enum":["HIT","MISS","COALESCED"]}},"X-Moenotes-Fetched-At":{"schema":{"type":"string"}}},
                     "content":{"application/json":{"schema":{"$ref":format!("#/components/schemas/{}",method.output)}}}},
                 "400":{"description":"Invalid query"},"401":{"description":"Missing or invalid HTTP API key"},
-                "404":{"description":"Experimental route disabled"},"429":{"description":"Local request queue full"},
+                "404":{"description":"Route disabled or unknown"},"405":{"description":"Only GET is supported; HEAD does not query upstream"},"429":{"description":"Local request queue full"},
                 "502":{"description":"Upstream business, transport or protocol error"},
                 "503":{"description":"Upstream session or availability blocked"},"504":{"description":"Request deadline exceeded"}
             }
         }}));
     }
-    json!({"openapi":"3.1.0","info":{"title":"moenotes-api","version":env!("CARGO_PKG_VERSION"),"description":"Experimental offline-validated query gateway. Not an official or stable API."},
+    json!({"openapi":"3.1.0","info":{"title":"moenotes-api","version":env!("CARGO_PKG_VERSION"),"description":"Experimental GET query gateway with limited live validation. Not an official or stable API."},
         "paths":paths,"components":{"securitySchemes":{"apiKey":{"type":"http","scheme":"bearer"}},"schemas":schemas}})
 }
 
@@ -68,7 +82,9 @@ fn kind(kind: Kind, schemas: &mut BTreeMap<String, Value>) -> Value {
             schema(message, schemas);
             json!({"$ref":format!("#/components/schemas/{name}")})
         }
-        Kind::Enum(_) => json!({"oneOf":[{"type":"string"},{"type":"integer","format":"int32"}]}),
+        Kind::Enum(enumeration) => {
+            json!({"oneOf":[{"type":"string","enum":enumeration.values().map(|v|v.name().to_owned()).collect::<Vec<_>>()},{"type":"integer","format":"int32"}]})
+        }
         Kind::Int64 | Kind::Sint64 | Kind::Sfixed64 => {
             json!({"type":"string","pattern":"^-?[0-9]+$"})
         }

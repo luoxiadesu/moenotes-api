@@ -634,3 +634,75 @@ fn defensive_input_and_response_limits() {
         SdkErrorKind::Protocol
     );
 }
+
+#[test]
+fn sdk_rsa_accepts_native_base64_wrapping() {
+    let public = private_key().to_public_key();
+    let canonical = public.to_public_key_pem(Default::default()).unwrap();
+    let base64 = canonical
+        .lines()
+        .filter(|line| !line.starts_with("-----"))
+        .collect::<String>();
+    for width in [64, 76, base64.len()] {
+        for newline in ["\n", "\r\n"] {
+            let wrapped = base64
+                .as_bytes()
+                .chunks(width)
+                .map(|part| std::str::from_utf8(part).unwrap())
+                .collect::<Vec<_>>()
+                .join(newline);
+            let pem = format!(
+                "-----BEGIN PUBLIC KEY-----{newline}{wrapped}{newline}-----END PUBLIC KEY-----"
+            );
+            let body = json!({"code":0,"data":{"rsa_key":pem,"hash":"synthetic-hash"}}).to_string();
+            let challenge = success(response::rsa(body.as_bytes(), Generation::new_v4()).unwrap());
+            let encrypted = encrypt_password(&challenge, "synthetic-password").unwrap();
+            let plain = private_key()
+                .decrypt(
+                    Pkcs1v15Encrypt,
+                    &STANDARD.decode(encrypted.as_bytes()).unwrap(),
+                )
+                .unwrap();
+            assert_eq!(plain, b"synthetic-hashsynthetic-password");
+        }
+    }
+}
+
+#[test]
+fn sdk_rsa_rejects_invalid_envelopes_and_base64() {
+    let public = private_key().to_public_key();
+    let pem = public.to_public_key_pem(Default::default()).unwrap();
+    for invalid in [
+        pem.replace("PUBLIC KEY", "RSA PUBLIC KEY"),
+        pem.replace("PUBLIC KEY", "PRIVATE KEY"),
+        format!("{pem}{pem}"),
+        format!("prefix{pem}"),
+        format!("{pem}suffix"),
+        "-----BEGIN PUBLIC KEY-----\n!!!!\n-----END PUBLIC KEY-----".into(),
+        "-----BEGIN PUBLIC KEY-----\nAAAA\n-----END PUBLIC KEY-----".into(),
+    ] {
+        assert!(parse_rsa_public_key(&invalid).is_err());
+    }
+}
+
+#[test]
+fn sdk_login_integer_uid_is_lossless_and_rejects_float_coercion() {
+    for uid in ["0", "9007199254740993", "18446744073709551615"] {
+        let body = format!(r#"{{"code":0,"data":{{"uid":{uid},"access_key":"synthetic"}}}}"#);
+        let user = success(response::login(body.as_bytes(), None).unwrap());
+        assert_eq!(user.uid(), uid);
+    }
+    for uid in [
+        "null",
+        "true",
+        "-1",
+        "1.5",
+        "1e3",
+        "18446744073709551616",
+        "[]",
+        "{}",
+    ] {
+        let body = format!(r#"{{"code":0,"data":{{"uid":{uid},"access_key":"synthetic"}}}}"#);
+        assert!(response::login(body.as_bytes(), None).is_err());
+    }
+}
