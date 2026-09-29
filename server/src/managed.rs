@@ -32,6 +32,9 @@ struct State {
     successes: u64,
     attempted: Option<Generation>,
     initial_attempted: Option<(Generation, Option<[u8; 32]>)>,
+    // Only a worker explicitly refused for its client version may be rearmed by
+    // adopting a release. Ordinary query errors must not replenish login budgets.
+    version_rejected_attempt: Option<Generation>,
     last_attempt: Option<Instant>,
     last_error: Option<ErrorKind>,
 }
@@ -48,8 +51,14 @@ pub struct Status {
 pub struct VersionSyncStatus {
     pub interval_seconds: u64,
     pub current: Option<moenotes_client::DataVersions>,
+    /// The client version presented to the game; differs from the configured one
+    /// after an update was followed (`follow_client_updates`).
+    pub client_version: String,
+    pub follow_client_updates: bool,
     pub checks: u64,
     pub updates: u64,
+    /// Client versions adopted since startup.
+    pub client_updates: u64,
     pub last_checked_at: Option<u64>,
     pub last_error: Option<ErrorKind>,
 }
@@ -146,6 +155,7 @@ impl ManagedClient {
                 successes: 0,
                 attempted: None,
                 initial_attempted: None,
+                version_rejected_attempt: None,
                 last_attempt: None,
                 last_error: None,
             })),
@@ -188,6 +198,7 @@ impl ManagedClient {
         s.phase = Phase::Unverified;
         s.attempted = None;
         s.initial_attempted = None;
+        s.version_rejected_attempt = None;
         s.last_attempt = None;
         s.last_error = None;
         Ok(())
@@ -272,6 +283,7 @@ impl ManagedClient {
             s.last_attempt = Some(Instant::now());
         }
         s.phase = Phase::Recovering;
+        s.version_rejected_attempt = None;
         s.attempts += 1;
         let state = self.state.clone();
         let inner = self.inner.clone();
@@ -292,6 +304,9 @@ impl ManagedClient {
                     s.last_error = None;
                 }
                 Err(e) => {
+                    if inner.generation() == generation && versions::client_update_required(&e) {
+                        s.version_rejected_attempt = Some(generation);
+                    }
                     s.phase = if inner.generation() != generation {
                         Phase::PersistenceFailed
                     } else {

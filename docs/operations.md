@@ -182,7 +182,10 @@ refreshes master versions automatically.
 
 The total worker deadline is 120 seconds. Cooldown is 60-86400 seconds across
 generations; failure exhausts that generation's attempt without a periodic retry
-loop. SDK expiry, network uncertainty or an absent role requires operator action.
+loop. An explicitly client-version-rejected worker may be retried by the next
+protected request after opt-in client release following adopts a new version;
+the cooldown still applies. SDK expiry, network uncertainty or an absent role
+requires operator action.
 Persistence failure blocks queries even if upstream login succeeded. Session
 rotation invalidates cached results, and locally rejected credentials cannot serve
 old authenticated cache entries.
@@ -215,7 +218,9 @@ logging in on the signal. See [accounts recovery](accounts.md#reload-and-recover
 Phases: unverified, ready, recovering, recovered, reauthentication_required,
 version_blocked, device_conflict, persistence_failed. The independent version
 poller clears an explicit master mismatch only after discovering a changed pair.
-Client upgrades and device blocks still require operator action. `session.version_sync`
+Device blocks still require operator action, and so do client upgrades unless
+`[version_sync] follow_client_updates` adopts a patch release (see
+[configuration](configuration.md#following-client-releases)). `session.version_sync`
 reports checks, effective versions and failures; Version success does not establish
 authenticated readiness. Whoami is not used as the sole validity probe.
 SIGTERM/Ctrl-C cancels queries and recovery. Cancellation cannot undo a sent login.
